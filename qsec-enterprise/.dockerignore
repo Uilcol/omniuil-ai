@@ -1,0 +1,19 @@
+# .dockerignore — exclude non-production files from Docker image
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.git
+**/.gitignore
+**/tests/
+**/test_*.py
+**/*_test.py
+**/.pytest_cache
+**/.mypy_cache
+**/node_modules
+**/*.log
+**/.env
+**/.env.*
+**/target/          # Rust build artifacts (copied separately)
+**/qsec-doc/
+**/qsec-enterprise/docker/  # avoid self-inclusion
+**/*.md             # README files not needed in image

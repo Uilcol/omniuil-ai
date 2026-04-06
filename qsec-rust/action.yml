@@ -1,0 +1,230 @@
+name: 'QSEC Post-Quantum Security Scan'
+description: >
+  Scans your codebase for weak cryptography vulnerable to quantum computers.
+  Detects RSA, ECDSA, MD5, SHA-1, insecure JWT, hardcoded secrets and more.
+  Uploads results to GitHub Security tab (SARIF) and annotates PRs.
+
+author: 'QSEC Team'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to scan (default: repo root)'
+    required: false
+    default: '.'
+
+  fail-on:
+    description: 'Comma-separated severities that fail the check (CRITICAL,HIGH,MEDIUM,LOW)'
+    required: false
+    default: 'CRITICAL,HIGH'
+
+  sarif-output:
+    description: 'Path to write SARIF file for GitHub Security tab'
+    required: false
+    default: 'qsec-results.sarif'
+
+  upload-sarif:
+    description: 'Upload SARIF to GitHub Security tab'
+    required: false
+    default: 'true'
+
+  qsec-version:
+    description: 'QSEC version to use (default: latest)'
+    required: false
+    default: 'latest'
+
+  config-file:
+    description: 'Path to .qsec.toml config (auto-detected if not specified)'
+    required: false
+    default: ''
+
+  sbom:
+    description: 'Generate SBOM alongside scan'
+    required: false
+    default: 'false'
+
+  sign-artifacts:
+    description: 'Sign build artifacts (requires artifacts-path)'
+    required: false
+    default: 'false'
+
+  artifacts-path:
+    description: 'Comma-separated paths to artifacts to sign'
+    required: false
+    default: ''
+
+outputs:
+  total-findings:
+    description: 'Total number of findings'
+    value: ${{ steps.scan.outputs.total-findings }}
+
+  critical-count:
+    description: 'Number of CRITICAL findings'
+    value: ${{ steps.scan.outputs.critical-count }}
+
+  high-count:
+    description: 'Number of HIGH findings'
+    value: ${{ steps.scan.outputs.high-count }}
+
+  sarif-path:
+    description: 'Path to generated SARIF file'
+    value: ${{ steps.scan.outputs.sarif-path }}
+
+  sbom-path:
+    description: 'Path to generated SBOM (if sbom=true)'
+    value: ${{ steps.sbom.outputs.sbom-path }}
+
+  quantum-risk-score:
+    description: 'Quantum Risk Score 0-100'
+    value: ${{ steps.scan.outputs.quantum-risk-score }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install QSEC
+      shell: bash
+      run: |
+        VERSION="${{ inputs.qsec-version }}"
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+
+        if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
+        if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi
+
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -sf https://api.github.com/repos/yourorg/qsec/releases/latest | jq -r .tag_name)
+        fi
+
+        DOWNLOAD_URL="https://github.com/yourorg/qsec/releases/download/${VERSION}/qsec-${OS}-${ARCH}"
+
+        echo "Installing QSEC ${VERSION} for ${OS}/${ARCH}..."
+        curl -sfL "${DOWNLOAD_URL}" -o /usr/local/bin/qsec
+        chmod +x /usr/local/bin/qsec
+        qsec --version
+
+    - name: Run Security Scan
+      id: scan
+      shell: bash
+      run: |
+        CONFIG_FLAG=""
+        if [ -n "${{ inputs.config-file }}" ]; then
+          CONFIG_FLAG="--config ${{ inputs.config-file }}"
+        fi
+
+        # Run scan and capture JSON output
+        qsec scan "${{ inputs.path }}" \
+          --format json \
+          $CONFIG_FLAG \
+          > /tmp/qsec-findings.json 2>&1 || true
+
+        # Generate SARIF
+        qsec scan "${{ inputs.path }}" \
+          --format sarif \
+          $CONFIG_FLAG \
+          > "${{ inputs.sarif-output }}" 2>&1 || true
+
+        # Parse metrics from JSON
+        TOTAL=$(jq 'length' /tmp/qsec-findings.json 2>/dev/null || echo "0")
+        CRITICAL=$(jq '[.[] | select(.severity == "CRITICAL")] | length' /tmp/qsec-findings.json 2>/dev/null || echo "0")
+        HIGH=$(jq '[.[] | select(.severity == "HIGH")] | length' /tmp/qsec-findings.json 2>/dev/null || echo "0")
+        MEDIUM=$(jq '[.[] | select(.severity == "MEDIUM")] | length' /tmp/qsec-findings.json 2>/dev/null || echo "0")
+
+        # Quantum Risk Score
+        SCORE=$(( CRITICAL * 25 + HIGH * 10 + MEDIUM * 3 ))
+        if [ "$SCORE" -gt 100 ]; then SCORE=100; fi
+
+        echo "total-findings=$TOTAL"       >> $GITHUB_OUTPUT
+        echo "critical-count=$CRITICAL"    >> $GITHUB_OUTPUT
+        echo "high-count=$HIGH"            >> $GITHUB_OUTPUT
+        echo "sarif-path=${{ inputs.sarif-output }}" >> $GITHUB_OUTPUT
+        echo "quantum-risk-score=$SCORE"   >> $GITHUB_OUTPUT
+
+        echo ""
+        echo "═══════════════════════════════════════════"
+        echo "  QSEC Quantum Security Report"
+        echo "═══════════════════════════════════════════"
+        echo "  Total findings:    $TOTAL"
+        echo "  Critical:          $CRITICAL"
+        echo "  High:              $HIGH"
+        echo "  Quantum Risk Score: $SCORE/100"
+        echo "═══════════════════════════════════════════"
+
+        # Fail logic
+        FAIL_ON="${{ inputs.fail-on }}"
+        SHOULD_FAIL=false
+
+        if echo "$FAIL_ON" | grep -q "CRITICAL" && [ "$CRITICAL" -gt 0 ]; then
+          echo "::error::QSEC: $CRITICAL CRITICAL finding(s) detected. Failing pipeline."
+          SHOULD_FAIL=true
+        fi
+        if echo "$FAIL_ON" | grep -q "HIGH" && [ "$HIGH" -gt 0 ]; then
+          echo "::error::QSEC: $HIGH HIGH finding(s) detected. Failing pipeline."
+          SHOULD_FAIL=true
+        fi
+
+        # PR annotations for each finding
+        if [ -f /tmp/qsec-findings.json ]; then
+          jq -c '.[]' /tmp/qsec-findings.json 2>/dev/null | while IFS= read -r finding; do
+            FILE=$(echo "$finding" | jq -r '.file // "unknown"')
+            LINE=$(echo "$finding" | jq -r '.line // 1')
+            SEV=$(echo "$finding" | jq -r '.severity // "MEDIUM"')
+            TITLE=$(echo "$finding" | jq -r '.title // "Security finding"')
+            REC=$(echo "$finding" | jq -r '.recommendation // ""')
+            RULE=$(echo "$finding" | jq -r '.rule_id // ""')
+
+            case "$SEV" in
+              CRITICAL|HIGH) LEVEL="error"   ;;
+              MEDIUM)         LEVEL="warning" ;;
+              *)               LEVEL="notice"  ;;
+            esac
+
+            echo "::${LEVEL} file=${FILE},line=${LINE},title=[${RULE}] ${TITLE}::${TITLE}. ${REC}"
+          done
+        fi
+
+        if [ "$SHOULD_FAIL" = "true" ]; then
+          exit 1
+        fi
+
+    - name: Upload SARIF to GitHub Security
+      if: inputs.upload-sarif == 'true' && always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-output }}
+        category: qsec-pqc-security
+
+    - name: Generate SBOM
+      id: sbom
+      if: inputs.sbom == 'true'
+      shell: bash
+      run: |
+        qsec sbom "${{ inputs.path }}" --out qsec-sbom.cyclonedx.json
+        echo "sbom-path=qsec-sbom.cyclonedx.json" >> $GITHUB_OUTPUT
+        echo "SBOM generated: qsec-sbom.cyclonedx.json"
+
+    - name: Sign Artifacts
+      if: inputs.sign-artifacts == 'true' && inputs.artifacts-path != ''
+      shell: bash
+      run: |
+        IFS=',' read -ra ARTIFACTS <<< "${{ inputs.artifacts-path }}"
+        for artifact in "${ARTIFACTS[@]}"; do
+          artifact=$(echo "$artifact" | xargs)
+          if [ -f "$artifact" ]; then
+            echo "Signing: $artifact"
+            qsec sign "$artifact" --out "${artifact}.qsec.json"
+          fi
+        done
+
+    - name: Upload Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: qsec-security-report
+        path: |
+          qsec-results.sarif
+          qsec-sbom.cyclonedx.json
+          /tmp/qsec-findings.json
+        retention-days: 30

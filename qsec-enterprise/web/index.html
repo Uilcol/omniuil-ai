@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSEC // Post-Quantum Firewall</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:8080 http://127.0.0.1:8080 ws://localhost:8080; img-src 'self' data:; frame-ancestors 'none'">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #030912;
+    --bg2:      #070f1e;
+    --bg3:      #0c1829;
+    --border:   #112240;
+    --border2:  #1a3356;
+    --accent:   #00d4ff;
+    --accent2:  #0066ff;
+    --green:    #00ff88;
+    --red:      #ff3355;
+    --orange:   #ff8c00;
+    --yellow:   #ffd700;
+    --text:     #c8d8f0;
+    --muted:    #4a6480;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { font-size: 14px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  .shell { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(3,9,18,0.95);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--sans);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .logo-tag {
+    font-size: 0.65rem; font-weight: 400; color: var(--muted);
+    border: 1px solid var(--border2);
+    padding: 2px 6px; border-radius: 3px;
+    letter-spacing: 0.08em;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
+  }
+
+  .header-stat { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+  .header-stat span { color: var(--accent); font-weight: 500; }
+
+  /* ── Auth banner ── */
+  #auth-banner {
+    background: linear-gradient(135deg, rgba(0,102,255,0.12), rgba(0,212,255,0.06));
+    border-bottom: 1px solid var(--accent2);
+    padding: 18px 28px;
+  }
+
+  #auth-banner h2 { font-family: var(--sans); font-size: 1rem; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+
+  .auth-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .inp {
+    background: var(--bg2); border: 1px solid var(--border2);
+    color: var(--text); font-family: var(--mono); font-size: 0.8rem;
+    padding: 8px 12px; border-radius: 4px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .inp:focus { border-color: var(--accent); }
+  .inp::placeholder { color: var(--muted); }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--mono); font-size: 0.78rem; font-weight: 500;
+    padding: 8px 16px; border-radius: 4px; cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s; letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--accent2); border-color: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--accent); color: var(--bg); }
+
+  .btn-outline {
+    background: transparent; border-color: var(--border2);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent; border-color: var(--red);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(255,51,85,0.1); }
+
+  .btn-green {
+    background: transparent; border-color: var(--green);
+    color: var(--green);
+  }
+  .btn-green:hover { background: rgba(0,255,136,0.08); }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main grid ── */
+  main {
+    flex: 1; padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 16px;
+  }
+
+  /* ── Panels ── */
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,212,255,0.03);
+  }
+
+  .panel-title {
+    font-family: var(--sans); font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent);
+  }
+
+  .panel-body { padding: 14px; }
+
+  /* ── Metric cards ── */
+  .metric-row { display: contents; }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 4px;
+    position: relative; overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0;
+    width: 3px; height: 100%;
+  }
+
+  .metric-card.accent::before { background: var(--accent); box-shadow: 0 0 10px rgba(0,212,255,0.5); }
+  .metric-card.red::before    { background: var(--red);    box-shadow: 0 0 10px rgba(255,51,85,0.4); }
+  .metric-card.green::before  { background: var(--green);  box-shadow: 0 0 10px rgba(0,255,136,0.4); }
+  .metric-card.yellow::before { background: var(--yellow); box-shadow: 0 0 10px rgba(255,215,0,0.4); }
+  .metric-card.orange::before { background: var(--orange); box-shadow: 0 0 10px rgba(255,140,0,0.4); }
+
+  .metric-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .metric-value {
+    font-family: var(--sans); font-size: 2.2rem; font-weight: 800;
+    line-height: 1; margin-top: 4px;
+  }
+
+  .metric-card.accent .metric-value { color: var(--accent); }
+  .metric-card.red .metric-value    { color: var(--red); }
+  .metric-card.green .metric-value  { color: var(--green); }
+  .metric-card.yellow .metric-value { color: var(--yellow); }
+  .metric-card.orange .metric-value { color: var(--orange); }
+
+  .metric-sub { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+  /* ── Scan panel (full width) ── */
+  .span-full  { grid-column: 1 / -1; }
+  .span-two   { grid-column: span 2; }
+
+  /* ── Scan form ── */
+  .scan-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; padding: 14px; border-bottom: 1px solid var(--border); }
+
+  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; }
+  .form-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .inp-wide { width: 100%; }
+
+  .check-label { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text); cursor: pointer; }
+  .check-label input { accent-color: var(--accent); }
+
+  /* ── Terminal / log ── */
+  .terminal {
+    background: #020810;
+    font-family: var(--mono); font-size: 0.78rem;
+    padding: 12px 14px;
+    height: 280px; overflow-y: auto;
+    border-top: 1px solid var(--border);
+    line-height: 1.7;
+  }
+
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-track { background: transparent; }
+  .terminal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 8px; }
+  .log-ts   { color: var(--muted); flex-shrink: 0; }
+  .log-msg  { color: var(--text); }
+  .log-msg.scanner    { color: var(--accent); }
+  .log-msg.analysis   { color: var(--green); }
+  .log-msg.remediation{ color: var(--yellow); }
+  .log-msg.incident   { color: var(--red); }
+  .log-msg.bus        { color: var(--orange); }
+  .log-msg.done       { color: var(--green); font-weight: 700; }
+
+  .cursor {
+    display: inline-block; width: 7px; height: 13px;
+    background: var(--accent); vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* ── Findings table ── */
+  .findings-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .findings-table th {
+    text-align: left; padding: 6px 10px;
+    font-size: 0.62rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .findings-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  .findings-table tr:last-child td { border-bottom: none; }
+  .findings-table tr:hover td { background: rgba(0,212,255,0.02); }
+
+  .badge {
+    font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 3px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .badge-critical { background: rgba(255,51,85,0.15);  color: var(--red);    border: 1px solid rgba(255,51,85,0.3); }
+  .badge-high     { background: rgba(255,140,0,0.15); color: var(--orange); border: 1px solid rgba(255,140,0,0.3); }
+  .badge-medium   { background: rgba(255,215,0,0.15); color: var(--yellow); border: 1px solid rgba(255,215,0,0.3); }
+  .badge-low      { background: rgba(0,255,136,0.1);  color: var(--green);  border: 1px solid rgba(0,255,136,0.2); }
+
+  .rule-id { color: var(--accent2); font-size: 0.68rem; }
+  .file-path { color: var(--muted); font-size: 0.68rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .code-snip { color: var(--muted); font-size: 0.68rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+
+  /* ── Risk gauge ── */
+  .risk-gauge { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; }
+
+  .gauge-arc {
+    width: 140px; height: 70px; position: relative;
+    overflow: hidden;
+  }
+  .gauge-bg, .gauge-fill {
+    position: absolute; width: 140px; height: 140px;
+    top: 0; left: 0; border-radius: 50%;
+    transform-origin: center;
+  }
+  .gauge-bg   { border: 10px solid var(--border); clip-path: inset(50% 0 0 0); }
+  .gauge-fill {
+    border: 10px solid var(--red); clip-path: inset(50% 0 0 0);
+    transition: transform 0.8s cubic-bezier(.4,0,.2,1);
+  }
+
+  .gauge-score {
+    font-family: var(--sans); font-size: 2.4rem; font-weight: 800;
+    color: var(--red); margin-top: -10px;
+  }
+  .gauge-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* ── Engine info ── */
+  .engine-grid { display: grid; gap: 8px; }
+  .engine-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .engine-row:last-child { border: none; }
+  .engine-key { color: var(--muted); }
+  .engine-val { color: var(--accent); font-weight: 500; }
+  .engine-val.green { color: var(--green); }
+  .engine-val.orange { color: var(--orange); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 8px 14px; font-size: 0.7rem; cursor: pointer;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all 0.15s; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── JWT tool ── */
+  .jwt-out {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 0.7rem; color: var(--accent);
+    word-break: break-all;
+    margin-top: 8px;
+    min-height: 40px;
+    font-family: var(--mono);
+  }
+
+  /* ── Scrollable findings area ── */
+  .findings-wrap { max-height: 320px; overflow-y: auto; }
+  .findings-wrap::-webkit-scrollbar { width: 4px; }
+  .findings-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 28px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.65rem; color: var(--muted);
+    background: var(--bg);
+  }
+
+  .footer-left { display: flex; gap: 20px; }
+
+  /* ── Notifications ── */
+  #notify-area {
+    position: fixed; top: 70px; right: 20px; z-index: 999;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .notify {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 5px; padding: 10px 14px;
+    font-size: 0.75rem; color: var(--text);
+    max-width: 320px; animation: slideIn 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } }
+  .notify.success { border-color: var(--green); }
+  .notify.error   { border-color: var(--red); }
+  .notify.warn    { border-color: var(--orange); }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── QRS bar ── */
+  .qrs-bar-wrap { margin-top: 6px; }
+  .qrs-bar-bg { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .qrs-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+  /* ── Phase cards ── */
+  .phase-list { display: flex; flex-direction: column; gap: 6px; }
+  .phase-item { padding: 8px 10px; border-radius: 4px; border: 1px solid; font-size: 0.72rem; }
+  .phase-item.p1 { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.04); }
+  .phase-item.p2 { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.04); }
+  .phase-item.p3 { border-color: rgba(0,102,255,0.3); background: rgba(0,102,255,0.04); }
+  .phase-title { font-weight: 600; margin-bottom: 4px; }
+  .phase-item.p1 .phase-title { color: var(--green); }
+  .phase-item.p2 .phase-title { color: var(--yellow); }
+  .phase-item.p3 .phase-title { color: var(--accent2); }
+  .phase-item ul { list-style: none; }
+  .phase-item ul li::before { content: "→ "; color: var(--muted); }
+  .phase-item ul li { color: var(--text); }
+
+  /* responsive */
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr 1fr; }
+    .span-two { grid-column: span 2; }
+  }
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+    .span-full, .span-two { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    QSEC
+    <span class="logo-tag">POST-QUANTUM v3.0.0</span>
+  </div>
+  <div class="header-right">
+    <div class="status-dot" id="engine-dot" title="Engine status"></div>
+    <span class="header-stat">ENGINE <span id="hdr-engine">—</span></span>
+    <span class="header-stat">UPTIME <span id="hdr-uptime">—</span></span>
+    <span class="header-stat">CALLS <span id="hdr-calls">0</span></span>
+  </div>
+</header>
+
+<!-- ── Notifications ── -->
+<div id="notify-area"></div>
+
+<!-- ── Auth banner ── -->
+<div id="auth-banner">
+  <h2>// AUTHENTICATE</h2>
+  <div class="auth-form">
+    <div>
+      <label class="form-label" style="display:block;margin-bottom:4px">API Endpoint</label>
+      <input class="inp" id="api-url" value="http://localhost:8080" placeholder="http://localhost:8080" style="width:240px">
+    </div>
+    <div>
+      <label class="form-label" style="display:block;margin-bottom:4px">API Secret</label>
+      <input class="inp" id="api-secret" type="password" placeholder="enter API secret" autocomplete="off" style="width:280px">
+    </div>
+    <button class="btn btn-primary" onclick="window._qsecConnect()">CONNECT</button>
+    <span id="auth-status" style="font-size:0.75rem;color:var(--muted)"></span>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<main id="main-content" style="display:none">
+
+  <!-- Metric cards -->
+  <div class="metric-card accent">
+    <div class="metric-label">Total Findings</div>
+    <div class="metric-value" id="m-findings">0</div>
+    <div class="metric-sub">across all scans</div>
+  </div>
+
+  <div class="metric-card red">
+    <div class="metric-label">Critical</div>
+    <div class="metric-value" id="m-critical">0</div>
+    <div class="metric-sub">immediate action required</div>
+  </div>
+
+  <div class="metric-card orange">
+    <div class="metric-label">High</div>
+    <div class="metric-value" id="m-high">0</div>
+    <div class="metric-sub">migration within 6 months</div>
+  </div>
+
+  <div class="metric-card yellow">
+    <div class="metric-label">Scans Run</div>
+    <div class="metric-value" id="m-scans">0</div>
+    <div class="metric-sub">total jobs executed</div>
+  </div>
+
+  <div class="metric-card green">
+    <div class="metric-label">Patches Applied</div>
+    <div class="metric-value" id="m-patches">0</div>
+    <div class="metric-sub">auto-remediated</div>
+  </div>
+
+  <div class="metric-card accent">
+    <div class="metric-label">JWT Tokens</div>
+    <div class="metric-value" id="m-tokens">0</div>
+    <div class="metric-sub"><span id="m-revoked" style="color:var(--red)">0</span> revoked</div>
+  </div>
+
+  <!-- ── Scan panel (full width) ── -->
+  <div class="panel span-full">
+    <div class="panel-header">
+      <span class="panel-title">// QUANTUM AUDIT</span>
+      <div id="scan-status-badge" style="font-size:0.65rem;color:var(--muted)">IDLE</div>
+    </div>
+
+    <div class="scan-form">
+      <div class="form-group">
+        <label class="form-label">Target Path</label>
+        <input class="inp inp-wide" id="scan-path" value="." placeholder="/path/to/project">
+      </div>
+      <div class="form-group" style="flex:0;align-self:center;padding-top:14px">
+        <label class="check-label">
+          <input type="checkbox" id="auto-remediate"> Auto-Remediate Quick Wins
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;align-self:flex-end">
+        <button class="btn btn-primary" id="btn-scan" onclick="startAudit()">▶ RUN AUDIT</button>
+        <button class="btn btn-outline" onclick="clearLog()">CLEAR</button>
+      </div>
+    </div>
+
+    <!-- Live terminal -->
+    <div class="terminal" id="terminal">
+      <div class="log-line"><span class="log-ts">00:00:00</span><span class="log-msg" style="color:var(--muted)">QSEC Enterprise — ready. Authenticate and run an audit.</span></div>
+      <div class="log-line"><span class="log-ts">&nbsp;</span><span class="log-msg"><span class="cursor"></span></span></div>
+    </div>
+  </div>
+
+  <!-- ── Findings panel ── -->
+  <div class="panel span-two">
+    <div class="panel-header">
+      <span class="panel-title">// FINDINGS</span>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:0.65rem" onclick="loadFindings()">REFRESH</button>
+    </div>
+    <div class="panel-body" style="padding:0">
+      <div class="findings-wrap">
+        <table class="findings-table">
+          <thead>
+            <tr>
+              <th>Sev</th>
+              <th>Rule</th>
+              <th>Title</th>
+              <th>File</th>
+              <th>Line</th>
+              <th>Code</th>
+            </tr>
+          </thead>
+          <tbody id="findings-body">
+            <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;font-size:0.72rem">No findings — run an audit to populate</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Risk + Engine ── -->
+  <div class="panel" style="display:flex;flex-direction:column;gap:0">
+    <div class="panel-header"><span class="panel-title">// QUANTUM RISK</span></div>
+    <div class="risk-gauge">
+      <div class="gauge-arc">
+        <div class="gauge-bg"></div>
+        <div class="gauge-fill" id="gauge-fill"></div>
+      </div>
+      <div class="gauge-score" id="qrs-score">—</div>
+      <div class="gauge-label">Quantum Risk Score</div>
+      <div class="qrs-bar-wrap" style="width:100%">
+        <div class="qrs-bar-bg"><div class="qrs-bar-fill" id="qrs-bar" style="width:0%;background:var(--red)"></div></div>
+      </div>
+      <div style="font-size:0.65rem;color:var(--muted);text-align:center" id="qrs-label">Run an audit to calculate</div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding:14px">
+      <div class="panel-title" style="margin-bottom:10px">ENGINE STATUS</div>
+      <div class="engine-grid" id="engine-info">
+        <div class="engine-row"><span class="engine-key">KEM</span><span class="engine-val">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Migration plan ── -->
+  <div class="panel span-two">
+    <div class="panel-header">
+      <span class="panel-title">// MIGRATION ROADMAP</span>
+    </div>
+    <div class="panel-body" id="migration-plan">
+      <div style="color:var(--muted);font-size:0.72rem">Run an audit to generate your PQC migration plan.</div>
+    </div>
+  </div>
+
+  <!-- ── JWT Tool ── -->
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">// PQC-JWT TOOL</span></div>
+    <div class="panel-body">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('jwt','issue')">Issue</div>
+        <div class="tab" onclick="switchTab('jwt','verify')">Verify</div>
+        <div class="tab" onclick="switchTab('jwt','revoke')">Revoke</div>
+      </div>
+
+      <div class="tab-content active" id="jwt-issue" style="padding-top:10px">
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">Subject</label>
+          <input class="inp inp-wide" id="jwt-sub" placeholder="user@example.com">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Audience</label>
+            <input class="inp inp-wide" id="jwt-aud" value="api.example.com">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">TTL (s)</label>
+            <input class="inp inp-wide" id="jwt-ttl" value="3600" type="number">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="issueJwt()">ISSUE PQC-JWT</button>
+        <div class="jwt-out" id="jwt-output">Waiting...</div>
+      </div>
+
+      <div class="tab-content" id="jwt-verify" style="padding-top:10px">
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">Token</label>
+          <textarea class="inp inp-wide" id="jwt-verify-token" rows="3" placeholder="Paste PQC-JWT here..."></textarea>
+        </div>
+        <button class="btn btn-green" onclick="verifyJwt()">VERIFY TOKEN</button>
+        <div class="jwt-out" id="jwt-verify-out">—</div>
+      </div>
+
+      <div class="tab-content" id="jwt-revoke" style="padding-top:10px">
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">JTI (token ID)</label>
+          <input class="inp inp-wide" id="jwt-revoke-jti" placeholder="xxxxxxxx-xxxx-...">
+        </div>
+        <button class="btn btn-danger" onclick="revokeJwt()">REVOKE TOKEN</button>
+        <div class="jwt-out" id="jwt-revoke-out">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Key management ── -->
+  <div class="panel span-two">
+    <div class="panel-header"><span class="panel-title">// KEY MANAGEMENT</span></div>
+    <div class="panel-body">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-outline" onclick="loadKeys()">STATUS</button>
+        <button class="btn btn-green" onclick="rotateKeys()">ROTATE KEYS</button>
+        <span style="font-size:0.72rem;color:var(--muted)">Algorithm: Ed25519 + ML-DSA-87 (NIST FIPS 204)</span>
+      </div>
+      <div style="margin-top:12px;font-size:0.72rem" id="key-info">
+        <span style="color:var(--muted)">Click STATUS to load key info</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="footer-left">
+    <span>QSEC v3.0.0 // Post-Quantum Cryptographic Firewall</span>
+    <span>ML-KEM-1024 + ML-DSA-87 (NIST FIPS 203/204)</span>
+    <span>AES-256-GCM + HKDF-SHA3-256</span>
+  </div>
+  <span id="footer-ts"></span>
+</footer>
+
+</div><!-- /shell -->
+
+<script>
+// ── IIFE: all state inside closure — TOKEN not accessible from window ─────────
+// FIX HIGH: global TOKEN and API_BASE removed from window scope.
+// All functions are exposed via window.QSEC = {} API only.
+(function() {
+'use strict';
+
+// ── Private state ─────────────────────────────────────────────────────────────
+let _API_BASE = 'http://localhost:8080';
+let _TOKEN    = null;
+let _TOKEN_EXP = 0;
+let currentJobId = null;
+let _dashInterval = null;
+let _footerInterval = null;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function notify(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `notify ${type}`;
+  el.textContent = msg;
+  document.getElementById('notify-area').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function $ (id) { return document.getElementById(id); }
+
+function logLine(msg, cls = '') {
+  const t = document.getElementById('terminal');
+  const ts = new Date().toTimeString().split(' ')[0];
+  const cls2 = (() => {
+    if (msg.includes('[ScannerAgent]'))     return 'scanner';
+    if (msg.includes('[AnalysisAgent]'))    return 'analysis';
+    if (msg.includes('[RemediationAgent]')) return 'remediation';
+    if (msg.includes('[IncidentAgent]'))    return 'incident';
+    if (msg.includes('[AgentBus]'))         return 'bus';
+    if (msg.includes('complete') || msg.includes('PASSED')) return 'done';
+    return cls;
+  })();
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${cls2}">${escHtml(msg)}</span>`;
+  // Remove cursor line
+  const cursorLine = t.querySelector('.cursor')?.closest('.log-line');
+  if (cursorLine) cursorLine.remove();
+  t.appendChild(line);
+  // Re-add cursor
+  const cur = document.createElement('div');
+  cur.className = 'log-line';
+  cur.innerHTML = `<span class="log-ts">&nbsp;</span><span class="log-msg"><span class="cursor"></span></span>`;
+  t.appendChild(cur);
+  t.scrollTop = t.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function api(method, path, body = null) {
+  // FIX MEDIUM: check token expiry before sending
+  if (_TOKEN && _TOKEN_EXP && Date.now() > _TOKEN_EXP) {
+    _TOKEN = null; _TOKEN_EXP = 0;
+    notify('Session expired — please reconnect', 'error');
+    $('auth-banner').style.display = 'block';
+    $('main-content').style.display = 'none';
+    throw new Error('Token expired');
+  }
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(_TOKEN ? {'Authorization': `Bearer ${_TOKEN}`} : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  };
+  const r = await fetch(`${_API_BASE}${path}`, opts);
+  return r.json();
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+async function authenticate() {
+  _API_BASE = $('api-url').value.replace(/\/$/, '');
+  const secret = $('api-secret').value;
+  if (!secret) { notify('Enter API secret first', 'error'); return; }
+  $('auth-status').textContent = 'Connecting...';
+  try {
+    const res = await fetch(`${_API_BASE}/api/v1/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: 'dashboard', client_secret: secret }),
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      _TOKEN    = data.access_token;
+      _TOKEN_EXP = Date.now() + (data.expires_in || 3600) * 1000;
+      // FIX HIGH: clear secret from input after successful auth
+      $('api-secret').value = '';
+      $('auth-banner').style.display = 'none';
+      $('main-content').style.display = 'grid';
+      $('auth-status').textContent = '';
+      notify(`Connected — scopes: ${data.scopes?.join(', ')}`, 'success');
+      logLine(`[Auth] Connected to QSEC API`, 'analysis');
+      logLine(`[Auth] Token issued — scopes: ${data.scopes?.join(', ')}`);
+      await loadDashboard();
+      await loadEngineInfo();
+      if (_dashInterval)  clearInterval(_dashInterval);
+      if (_footerInterval) clearInterval(_footerInterval);
+      _dashInterval   = setInterval(loadDashboard, 10000);
+      _footerInterval = setInterval(updateFooter, 1000);
+    } else {
+      $('auth-status').textContent = '✗ ' + escHtml(data.error || 'Auth failed');
+      notify(data.error || 'Authentication failed', 'error');
+    }
+  } catch (e) {
+    $('auth-status').textContent = '✗ Cannot reach server';
+    notify('Cannot reach server: ' + e.message, 'error');
+  }
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+async function loadDashboard() {
+  try {
+    const d = await api('GET', '/api/v1/dashboard');
+    if (!d.metrics) return;
+    const m = d.metrics;
+    $('m-findings').textContent = m.findings_total ?? 0;
+    $('m-critical').textContent = m.critical_total ?? 0;
+    $('m-high').textContent     = m.high_total ?? 0;
+    $('m-scans').textContent    = m.scans_total ?? 0;
+    $('m-patches').textContent  = m.patches_applied ?? 0;
+    $('m-tokens').textContent   = m.tokens_issued ?? 0;
+    $('m-revoked').textContent  = m.revoked_tokens ?? 0;
+    $('hdr-calls').textContent  = m.api_calls_total ?? 0;
+    $('hdr-uptime').textContent = d.uptime ?? '—';
+    if (d.recent_findings?.length > 0) renderFindings(d.recent_findings);
+  } catch {}
+}
+
+async function loadEngineInfo() {
+  try {
+    const r = await api('GET', '/api/v1/engine/info');
+    const d = r.data || {};
+    $('hdr-engine').textContent = d.backend?.includes('liboqs') ? 'PRODUCTION' : 'SIMULATION';
+    const rows = [
+      ['KEM',      d.kem_algorithm || 'X25519 + ML-KEM-1024'],
+      ['DSA',      d.dsa_algorithm || 'Ed25519 + ML-DSA-87'],
+      ['Symmetric',d.symmetric || 'AES-256-GCM'],
+      ['KDF',      d.kdf || 'HKDF-SHA3-256'],
+      ['HNDL Prot',d.hndl_protection ? '✓ ENABLED' : '✗ DISABLED'],
+      ['NIST PQC', d.nist_pqc_compliant ? '✓ FIPS 203/204' : '◎ Reference'],
+      ['Backend',  d.backend || '—'],
+    ];
+    const isReal = d.nist_pqc_compliant;
+    // FIX HIGH: all server values escaped
+    $('engine-info').innerHTML = rows.map(([k,v]) => {
+      const ek = escHtml(k), ev = escHtml(v);
+      const cls = v.startsWith('✓') ? 'green' : v.startsWith('\u2717') ? 'red' : '';
+      return '<div class="engine-row"><span class="engine-key">'+ek+'</span>'
+           + '<span class="engine-val '+escHtml(cls)+'">'+ev+'</span></div>';
+    }).join('');
+  } catch {}
+}
+
+// ── Audit ─────────────────────────────────────────────────────────────────────
+
+async function startAudit() {
+  const path = $('scan-path').value.trim() || '.';
+  const auto = $('auto-remediate').checked;
+
+  $('btn-scan').disabled = true;
+  $('btn-scan').innerHTML = '<span class="spinner"></span> RUNNING';
+  $('scan-status-badge').textContent = 'RUNNING';
+  $('scan-status-badge').style.color = 'var(--accent)';
+
+  logLine(`[Orchestrator] Starting full quantum audit: ${path}`);
+  logLine(`[Orchestrator] Auto-remediate: ${auto ? 'YES' : 'NO'}`);
+
+  try {
+    const job = await api('POST', '/api/v1/agents/audit', { path, auto_remediate: auto });
+    currentJobId = job.job_id;
+    logLine(`[Orchestrator] Job ID: ${job.job_id}`);
+
+    // SSE stream — browser EventSource cannot send custom headers;
+    // token passed as query param (server validates identically to Bearer header).
+    // FIX MEDIUM: token in URL is logged by web servers — acceptable tradeoff vs. no auth.
+    // Mitigation: server strips token from access log format in production.
+    const streamUrl = `${_API_BASE}/api/v1/agents/audit/${job.job_id}/stream?token=${encodeURIComponent(_TOKEN)}`;
+    const es = new EventSource(streamUrl);
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.error) {
+        logLine('[Error] ' + escHtml(data.error || ''));
+        if (data.error === 'token_expired') {
+          _TOKEN = null; _TOKEN_EXP = 0;
+          notify('Session expired — please reconnect', 'error');
+          $('auth-banner').style.display = 'block';
+          $('main-content').style.display = 'none';
+        }
+        es.close(); resetScanBtn(); return;
+      }
+      if (data.event === 'done') {
+        es.close();
+        onAuditComplete(job.job_id);
+        return;
+      }
+      if (data.msg) logLine(data.msg);
+    };
+    es.onerror = () => { es.close(); pollAuditJob(job.job_id); };
+  } catch(e) {
+    logLine(`[Error] ${e.message}`, 'red');
+    resetScanBtn();
+  }
+}
+
+async function pollAuditJob(jobId) {
+  let tries = 0;
+  const iv = setInterval(async () => {
+    try {
+      const job = await api('GET', `/api/v1/agents/audit/${jobId}`);
+      const log = job.log || [];
+      // Re-emit new log lines
+      if (log.length) log.slice(-3).forEach(e => logLine(e.msg));
+      if (job.status === 'completed' || tries++ > 60) {
+        clearInterval(iv);
+        await onAuditComplete(jobId);
+      }
+    } catch { clearInterval(iv); resetScanBtn(); }
+  }, 800);
+}
+
+async function onAuditComplete(jobId) {
+  try {
+    const job = await api('GET', `/api/v1/agents/audit/${jobId}`);
+    const r = job.result || {};
+    const qrs = r.quantum_risk_score ?? 0;
+    const cnt = r.severity_counts || {};
+
+    logLine(`[Orchestrator] ✓ Audit complete — QRS: ${qrs}/100`);
+    logLine(`[Orchestrator] Findings: ${r.findings?.length ?? 0} (${cnt.critical ?? 0} CRITICAL, ${cnt.high ?? 0} HIGH)`);
+
+    if (r.patches_applied > 0)
+      logLine(`[RemediationAgent] ${r.patches_applied} patches applied successfully`);
+
+    renderQRS(qrs);
+    if (r.findings?.length > 0) renderFindings(r.findings);
+    if (r.migration_phases) renderMigration(r.migration_phases);
+    await loadDashboard();
+  } catch {}
+  resetScanBtn();
+}
+
+function resetScanBtn() {
+  $('btn-scan').disabled = false;
+  $('btn-scan').innerHTML = '▶ RUN AUDIT';
+  $('scan-status-badge').textContent = 'COMPLETE';
+  $('scan-status-badge').style.color = 'var(--green)';
+}
+
+function clearLog() {
+  $('terminal').innerHTML = `<div class="log-line"><span class="log-ts">00:00:00</span><span class="log-msg" style="color:var(--muted)">Log cleared.</span></div><div class="log-line"><span class="log-ts">&nbsp;</span><span class="log-msg"><span class="cursor"></span></span></div>`;
+  $('scan-status-badge').textContent = 'IDLE';
+  $('scan-status-badge').style.color = 'var(--muted)';
+  resetScanBtn();
+}
+
+// ── Findings ─────────────────────────────────────────────────────────────────
+
+async function loadFindings() {
+  const r = await api('GET', '/api/v1/findings?limit=50');
+  if (r.findings) renderFindings(r.findings);
+}
+
+function renderFindings(findings) {
+  if (!findings?.length) return;
+  const tbody = $('findings-body');
+  // FIX HIGH: ALL server data escaped through escHtml — prevents XSS
+  tbody.innerHTML = findings.map(f => {
+    const rawSev = escHtml(f.severity || '');
+    const sev    = rawSev.toLowerCase();
+    const badgeCls = 'badge badge-' + sev; // derived from escaped value — safe
+    return '<tr>' +
+      '<td><span class="' + badgeCls + '">' + rawSev + '</span></td>' +
+      '<td class="rule-id">'  + escHtml(f.rule_id || '—') + '</td>' +
+      '<td style="font-size:0.72rem">' + escHtml(f.title || '') + '</td>' +
+      '<td class="file-path" title="' + escHtml(f.file || '') + '">' +
+        escHtml((f.file||'').split('/').slice(-2).join('/')) + '</td>' +
+      '<td style="color:var(--muted);font-size:0.68rem">' + escHtml(String(f.line || '—')) + '</td>' +
+      '<td class="code-snip" title="' + escHtml(f.code_snippet || '') + '">' +
+        escHtml(f.code_snippet || '') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── QRS ───────────────────────────────────────────────────────────────────────
+
+function renderQRS(score) {
+  $('qrs-score').textContent = score;
+  const pct = Math.min(100, score);
+  $('qrs-bar').style.width = pct + '%';
+  const color = score >= 70 ? 'var(--red)' : score >= 40 ? 'var(--orange)' : score >= 20 ? 'var(--yellow)' : 'var(--green)';
+  $('qrs-bar').style.background = color;
+  $('qrs-score').style.color = color;
+
+  const label = score >= 70 ? '⚠ CRITICAL — Immediate HNDL exposure' :
+                score >= 40 ? '▲ HIGH — Migration required < 6 months' :
+                score >= 20 ? '◎ MODERATE — Planned migration recommended' :
+                              '✓ LOW — Minimal quantum exposure';
+  $('qrs-label').textContent = label;
+}
+
+// ── Migration ─────────────────────────────────────────────────────────────────
+
+function renderMigration(phases) {
+  // FIX HIGH: build HTML with escHtml on all server-sourced strings
+  function phaseItems(arr) {
+    return (arr || []).map(i => '<li>' + escHtml(i) + '</li>').join('');
+  }
+  var html2 = '<div class="phase-list">'
+    + '<div class="phase-item p1"><div class="phase-title">⚡ Phase 1 — Quick Wins (1-2 weeks)</div>'
+    + '<ul>' + phaseItems(phases.quick_wins) + '</ul></div>'
+    + '<div class="phase-item p2"><div class="phase-title">⚙ Phase 2 — Medium Effort (1-3 months)</div>'
+    + '<ul>' + phaseItems(phases.medium_term) + '</ul></div>'
+    + '<div class="phase-item p3"><div class="phase-title">⊕ Phase 3 — Full PQC (3-12 months)</div>'
+    + '<ul>' + phaseItems(phases.long_term) + '</ul></div>'
+    + '</div>';
+  $('migration-plan').innerHTML = html2;
+}
+
+// ── JWT ───────────────────────────────────────────────────────────────────────
+
+async function issueJwt() {
+  const sub = $('jwt-sub').value.trim();
+  if (!sub) { notify('Subject required', 'error'); return; }
+  const res = await api('POST', '/api/v1/jwt/issue', {
+    subject: sub, audience: $('jwt-aud').value, ttl: +$('jwt-ttl').value
+  });
+  const token = res?.data?.token || res?.token || JSON.stringify(res?.data || res);
+  $('jwt-output').textContent = token;
+  notify('PQC-JWT issued (Ed25519 + ML-DSA-87)', 'success');
+}
+
+async function verifyJwt() {
+  const token = $('jwt-verify-token').value.trim();
+  if (!token) { notify('Token required', 'error'); return; }
+  const res = await api('POST', '/api/v1/jwt/verify', { token });
+  $('jwt-verify-out').textContent = JSON.stringify(res, null, 2);
+  notify(res.success ? 'Token valid ✓' : 'Token invalid ✗', res.success ? 'success' : 'error');
+}
+
+async function revokeJwt() {
+  const jti = $('jwt-revoke-jti').value.trim();
+  if (!jti) { notify('JTI required', 'error'); return; }
+  const res = await api('POST', '/api/v1/jwt/revoke', { jti });
+  $('jwt-revoke-out').textContent = JSON.stringify(res, null, 2);
+  notify(`Token revoked (${res.total_revoked} total)`, 'warn');
+  await loadDashboard();
+}
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
+
+async function loadKeys() {
+  const r = await api('GET', '/api/v1/keys');
+  const d = r.data || {};
+  const k = d.current_key || {};
+  // FIX HIGH: all key data escaped through escHtml
+  var exdays = escHtml(String(k.expires_in_days ?? '—'));
+  var exCls  = (k.expires_in_days < 7) ? 'orange' : 'green';
+  $('key-info').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div class="engine-row"><span class="engine-key">Key ID</span>'
+    +   '<span class="engine-val">' + escHtml(k.key_id || '—') + '</span></div>'
+    + '<div class="engine-row"><span class="engine-key">Algorithm</span>'
+    +   '<span class="engine-val">' + escHtml(k.algorithm || '—') + '</span></div>'
+    + '<div class="engine-row"><span class="engine-key">Active Keys</span>'
+    +   '<span class="engine-val green">' + escHtml(String(d.active_keys || 1)) + '</span></div>'
+    + '<div class="engine-row"><span class="engine-key">Expires In</span>'
+    +   '<span class="engine-val '+exCls+'">' + exdays + ' days</span></div>'
+    + '</div>';
+}
+
+async function rotateKeys() {
+  const reason = prompt('Rotation reason:', 'Manual rotation');
+  if (!reason) return;
+  const r = await api('POST', '/api/v1/keys/rotate', { reason });
+  const d = r.data || {};
+  notify(`Keys rotated — new ID: ${escHtml(d.new_key_id || '?')}`, 'success');
+  logLine(`[KeyRegistry] Keys rotated — reason: ${escHtml(reason)}`, 'analysis');
+  await loadKeys();
+  await loadDashboard();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function switchTab(group, name) {
+  const parent = document.getElementById(`jwt-${name}`)?.closest('.panel-body');
+  if (!parent) return;
+  parent.querySelectorAll('.tab').forEach((t, i) => {
+    const contents = parent.querySelectorAll('.tab-content');
+    t.classList.toggle('active', t.textContent.trim().toLowerCase() === name.replace('jwt-',''));
+    if (contents[i]) contents[i].classList.toggle('active', t.textContent.trim().toLowerCase() === name.replace('jwt-',''));
+  });
+  parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`jwt-${name}`)?.classList.add('active');
+  parent.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.trim().toLowerCase() === name);
+  });
+}
+
+// ── Footer clock ─────────────────────────────────────────────────────────────
+
+function updateFooter() {
+  $('footer-ts').textContent = new Date().toISOString().replace('T',' ').split('.')[0] + ' UTC';
+}
+
+updateFooter();
+
+// FIX LOW: auto-connect removed — explicit user action required
+// FIX HIGH: no credentials pre-filled in inputs
+// Expose only connect button handler to HTML onclick attributes
+// Expose functions used by HTML onclick attributes
+// All other state (TOKEN, API_BASE) remains private in IIFE closure
+window._qsecConnect  = authenticate;
+window.startAudit    = startAudit;
+window.clearLog      = clearLog;
+window.loadFindings  = loadFindings;
+window.switchTab     = switchTab;
+window.issueJwt      = issueJwt;
+window.verifyJwt     = verifyJwt;
+window.revokeJwt     = revokeJwt;
+window.loadKeys      = loadKeys;
+window.rotateKeys    = rotateKeys;
+
+})(); // end IIFE
+</script>
+</body>
+</html>

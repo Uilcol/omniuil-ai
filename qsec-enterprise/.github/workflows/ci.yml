@@ -1,0 +1,320 @@
+name: QSEC CI — Build, Test, Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Job 1: Rust Engine — build + test (reference backend)
+  # ──────────────────────────────────────────────────────────────────────
+  rust-engine:
+    name: Rust Engine (reference)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: qsec-rust
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            qsec-rust/target
+          key: rust-${{ runner.os }}-${{ hashFiles('qsec-rust/Cargo.lock') }}
+          restore-keys: rust-${{ runner.os }}-
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy (no warnings)
+        run: cargo clippy -- -D warnings
+
+      - name: Cargo audit — Rust crate supply chain
+        run: |
+          cargo install cargo-audit --locked --quiet 2>/dev/null || true
+          cargo audit || echo "::warning::cargo audit found advisories — review before release"
+
+      - name: Build (reference backend)
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --release -- --test-threads=4
+
+      - name: Verify no unsafe code
+        run: grep -r "unsafe" src/ && exit 1 || echo "✓ No unsafe code"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsec-binary-reference
+          path: qsec-rust/target/release/qsec
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Job 2: Rust Engine — build with real liboqs (ML-KEM + ML-DSA)
+  # ──────────────────────────────────────────────────────────────────────
+  rust-engine-liboqs:
+    name: Rust Engine (liboqs — real PQC)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: qsec-rust
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build libssl-dev pkg-config
+
+      - name: Build liboqs (ML-KEM-1024 + ML-DSA-87)
+        run: |
+          git clone --depth 1 --branch 0.11.0 \
+            https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs
+          cmake -S /tmp/liboqs -B /tmp/liboqs/build \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DOQS_ALGS_ENABLED="ML_KEM_1024;ML_DSA_87" \
+            -DBUILD_SHARED_LIBS=ON
+          sudo cmake --build /tmp/liboqs/build --parallel
+          sudo cmake --install /tmp/liboqs/build
+          sudo ldconfig
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            qsec-rust/target
+          key: rust-liboqs-${{ runner.os }}-${{ hashFiles('qsec-rust/Cargo.lock') }}
+
+      - name: Build with liboqs (production PQC)
+        run: |
+          OQS_DIR=/usr/local \
+          PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
+          LD_LIBRARY_PATH=/usr/local/lib \
+          cargo build --release --features liboqs
+
+      - name: Run tests with liboqs
+        run: |
+          OQS_DIR=/usr/local \
+          LD_LIBRARY_PATH=/usr/local/lib \
+          cargo test --release --features liboqs -- --test-threads=4
+
+      - name: Verify liboqs linkage
+        run: ldd target/release/qsec | grep liboqs
+
+      - name: Upload production binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: qsec-binary-liboqs-production
+          path: qsec-rust/target/release/qsec
+          retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Job 3: Python agents — lint + tests
+  # ──────────────────────────────────────────────────────────────────────
+  python-agents:
+    name: Python Agents
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: qsec-agents
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio flake8 pip-audit
+
+      - name: Lint (flake8)
+        run: |
+          flake8 . --max-line-length=120 \
+            --extend-ignore=E203,W503 \
+            --exclude=__pycache__,.git
+
+      - name: Pip audit — Python dependency supply chain
+        run: pip-audit --requirement requirements.txt || echo "::warning::pip-audit found vulnerabilities — review before release"
+
+      - name: Run test suite (no API key needed)
+        run: pytest tests/ -v --tb=short --no-header -q
+        env:
+          QSEC_API_SECRET: ${{ secrets.CI_QSEC_SECRET || 'ci-test-secret-not-for-production' }}
+
+      - name: Verify path traversal protection
+        run: |
+          python3 -c "
+          import sys; sys.path.insert(0, '.')
+          import types
+          a = types.ModuleType('anthropic'); a.Anthropic = lambda **k: None
+          sys.modules['anthropic'] = a
+          from tools.qsec_tools import _safe_path
+          assert _safe_path('/etc/passwd') is None, 'FAIL: /etc/passwd not blocked'
+          assert _safe_path('/proc/self/environ') is None, 'FAIL: /proc not blocked'
+          assert _safe_path('/tmp/../../etc/shadow') is None, 'FAIL: traversal not blocked'
+          assert _safe_path('/tmp/test') is not None, 'FAIL: /tmp not allowed'
+          print('✓ Path traversal protection verified')
+          "
+
+      - name: Verify no hardcoded secrets
+        run: |
+          grep -rn "sk-ant-api\|API_KEY.*=.*['\"]sk" . && exit 1 || echo "✓ No hardcoded API keys"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Job 4: QSEC self-scan (eat your own dog food)
+  # ──────────────────────────────────────────────────────────────────────
+  self-scan:
+    name: QSEC Self-Scan
+    runs-on: ubuntu-24.04
+    needs: [rust-engine]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download QSEC binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qsec-binary-reference
+          path: /usr/local/bin/
+
+      - name: Make executable
+        run: chmod +x /usr/local/bin/qsec
+
+      - name: Scan Rust engine source
+        run: |
+          qsec scan qsec-rust/src --format json | tee scan-rust.json
+          python3 -c "
+          import json, sys
+          data = json.load(open('scan-rust.json'))
+          findings = data.get('findings', [])
+          critical = [f for f in findings if f['severity'] == 'CRITICAL']
+          print(f'Findings: {len(findings)} total, {len(critical)} CRITICAL')
+          if critical:
+              for f in critical:
+                  print(f'  CRITICAL: {f[\"rule_id\"]} in {f[\"file\"]}:{f[\"line\"]}')
+              sys.exit(1)
+          print('✓ No CRITICAL findings in Rust engine source')
+          "
+
+      - name: Scan Python agents source
+        run: |
+          qsec scan qsec-agents --format json | tee scan-agents.json
+          python3 -c "
+          import json, sys
+          data = json.load(open('scan-agents.json'))
+          findings = data.get('findings', [])
+          critical = [f for f in findings if f['severity'] == 'CRITICAL']
+          high     = [f for f in findings if f['severity'] == 'HIGH']
+          print(f'Findings: {len(findings)} total, {len(critical)} CRITICAL, {len(high)} HIGH')
+          if critical:
+              sys.exit(1)
+          print('✓ No CRITICAL findings in Python agents source')
+          "
+
+      - name: Generate SBOM
+        run: |
+          qsec sbom . --out sbom.cyclonedx.json
+          echo "SBOM generated:"
+          python3 -c "import json; d=json.load(open('sbom.cyclonedx.json')); print(f'  Format: {d[\"bomFormat\"]} {d[\"specVersion\"]}'); print(f'  Components: {len(d[\"components\"])}')"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cyclonedx.json
+          retention-days: 90
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Job 5: Docker build + validate
+  # ──────────────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-24.04
+    needs: [rust-engine, python-agents]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: qsec-enterprise/docker/Dockerfile
+          push: false
+          tags: qsec-enterprise:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Test Docker image
+        run: |
+          docker run -d \
+            -e QSEC_API_SECRET=ci-test-secret \
+            -p 8080:8080 \
+            --name qsec-test \
+            qsec-enterprise:${{ github.sha }}
+          sleep 5
+          curl -sf http://localhost:8080/health | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d['status'] == 'ok', f'Health check failed: {d}'
+          print('✓ Health check passed')
+          "
+          docker stop qsec-test
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: qsec-enterprise/docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/qsec-enterprise:latest
+            ghcr.io/${{ github.repository_owner }}/qsec-enterprise:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

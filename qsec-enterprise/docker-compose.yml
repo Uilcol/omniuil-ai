@@ -1,0 +1,170 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# QSEC Enterprise — Stack Completa com Ollama Embutido
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#  INSTALAÇÃO DO CLIENTE (1 comando):
+#  curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/qsec/main/install.sh | bash
+#
+#  OU manualmente:
+#  docker compose up -d
+#  Acesse: http://localhost:8080
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: qsec
+
+services:
+
+  # ── 1. Ollama — LLM Local, Gratuito, Privado ────────────────────────────
+  # Nenhum dado sai da máquina do cliente. Zero custo de API.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: qsec-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - qsec-net
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_MAX_LOADED_MODELS=1
+    # GPU opcional — descomente se tiver NVIDIA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── 2. Ollama Init — baixa o modelo automaticamente ─────────────────────
+  # Executa uma vez, baixa o modelo escolhido, e encerra.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: qsec-ollama-init
+    restart: "no"
+    networks:
+      - qsec-net
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - QSEC_OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo '[QSEC] Verificando modelo ${QSEC_OLLAMA_MODEL:-llama3.2:3b}...';
+        ollama pull ${QSEC_OLLAMA_MODEL:-llama3.2:3b} &&
+        echo '[QSEC] Modelo pronto!' ||
+        echo '[WARN] Falha ao baixar modelo — usando modo sem IA'
+      "
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "2" }
+
+  # ── 3. QSEC API + Dashboard ──────────────────────────────────────────────
+  qsec-api:
+    build:
+      context: ../..
+      dockerfile: qsec-enterprise/docker/Dockerfile
+    image: qsec-enterprise:3.2.1
+    container_name: qsec-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # Segurança
+      - QSEC_API_SECRET=${QSEC_API_SECRET:?ERRO: defina QSEC_API_SECRET no arquivo .env}
+      - QSEC_BIN=/usr/local/bin/qsec
+      - QSEC_PRODUCTION=1
+      # LLM — Ollama por padrão, sem custo, sem API key
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-180}
+      # Providers alternativos (opcionais)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # Rede
+      - HOST=0.0.0.0
+      - PORT=8080
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+    volumes:
+      # Banco de dados local — resultados persistem entre reinicializações
+      - qsec-data:/app/data
+      - qsec-alerts:/app/qsec-alerts
+      - qsec-backups:/app/.qsec-backup
+      # Pasta do projeto do cliente para escanear (somente leitura)
+      - ${SCAN_TARGET:-/tmp}:/scan-target:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\" 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+    networks:
+      - qsec-net
+    logging:
+      driver: "json-file"
+      options: { max-size: "50m", max-file: "5" }
+
+  # ── 4. Nginx — Proxy reverso com TLS (perfil produção) ──────────────────
+  # Ativo apenas com: docker compose --profile production up
+  qsec-proxy:
+    image: nginx:1.27-alpine
+    container_name: qsec-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_DIR:-./certs}:/etc/nginx/certs:ro
+    depends_on:
+      qsec-api:
+        condition: service_healthy
+    networks:
+      - qsec-net
+    profiles:
+      - production
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "3" }
+
+# ── Volumes persistentes ────────────────────────────────────────────────────
+volumes:
+  ollama-models:        # modelos LLM (~2-20 GB dependendo do modelo)
+    driver: local
+  qsec-data:            # banco de dados de resultados
+    driver: local
+  qsec-alerts:          # alertas e notificações
+    driver: local
+  qsec-backups:         # backups de código antes de patches
+    driver: local
+
+# ── Rede interna isolada ────────────────────────────────────────────────────
+networks:
+  qsec-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -1,0 +1,357 @@
+name: QSEC Security
+
+on:
+  push:
+    branches: [main, master, develop, 'release/**']
+  pull_request:
+    branches: [main, master, develop]
+  schedule:
+    # Scan diário às 02:00 UTC — detecta novas vulnerabilidades em deps
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      fail-on:
+        description: 'Fail pipeline on (CRITICAL,HIGH,MEDIUM,LOW)'
+        default: 'CRITICAL,HIGH'
+        required: false
+      auto-remediate:
+        description: 'Auto-apply quick win patches (yes/no)'
+        default: 'no'
+        required: false
+
+permissions:
+  contents:       read
+  security-events: write    # upload SARIF
+  pull-requests:  write     # PR annotations e comments
+  id-token:       write     # OIDC para signing
+  packages:       write     # GitHub Container Registry
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QSEC_VERSION: '3.0.0'
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ─── Build & Test Engine ────────────────────────────────────────────────────
+  build-engine:
+    name: Build QSEC Engine (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: qsec-linux-amd64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: qsec-macos-amd64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: qsec-windows-amd64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            qsec-rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('qsec-rust/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install liboqs (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y liboqs-dev cmake ninja-build
+
+      - name: Install liboqs (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install liboqs
+
+      - name: Lint (clippy)
+        working-directory: qsec-rust
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Format check
+        working-directory: qsec-rust
+        run: cargo fmt --check
+
+      - name: Build (reference backend)
+        working-directory: qsec-rust
+        run: cargo build --release
+
+      - name: Build (liboqs — real PQC, Linux/macOS only)
+        if: matrix.os != 'windows-latest'
+        working-directory: qsec-rust
+        run: cargo build --release --features liboqs
+
+      - name: Run Tests
+        working-directory: qsec-rust
+        run: cargo test --release
+
+      - name: Run Tests (liboqs, Linux/macOS only)
+        if: matrix.os != 'windows-latest'
+        working-directory: qsec-rust
+        run: cargo test --release --features liboqs
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            qsec-rust/target/release/qsec
+            qsec-rust/target/release/qsec.exe
+
+  # ─── Security Scan ──────────────────────────────────────────────────────────
+  security-scan:
+    name: QSEC Security Scan
+    runs-on: ubuntu-latest
+    needs: build-engine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download QSEC binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qsec-linux-amd64
+          path: /tmp/qsec-bin
+
+      - name: Setup QSEC
+        run: |
+          chmod +x /tmp/qsec-bin/qsec
+          sudo mv /tmp/qsec-bin/qsec /usr/local/bin/qsec
+          qsec --version
+
+      - name: Scan this repository
+        run: |
+          qsec scan . \
+            --format sarif \
+            --fail-on-critical \
+            > qsec-results.sarif
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: qsec-results.sarif
+          category: qsec-quantum-security
+
+      - name: Generate SBOM
+        run: qsec sbom . --out qsec-sbom.cyclonedx.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: |
+            qsec-results.sarif
+            qsec-sbom.cyclonedx.json
+
+  # ─── PR Security Comment ───────────────────────────────────────────────────
+  pr-comment:
+    name: PR Security Report
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qsec-linux-amd64
+          path: /tmp/qsec-bin
+
+      - name: Run scan (JSON)
+        run: |
+          chmod +x /tmp/qsec-bin/qsec
+          sudo mv /tmp/qsec-bin/qsec /usr/local/bin/qsec
+          qsec scan . --format json > /tmp/findings.json 2>/dev/null || true
+
+      - name: Generate PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let findings = [];
+            try {
+              findings = JSON.parse(fs.readFileSync('/tmp/findings.json', 'utf8'));
+            } catch(e) { findings = []; }
+
+            const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+            findings.forEach(f => { counts[f.severity] = (counts[f.severity] || 0) + 1; });
+
+            const score = Math.min(100,
+              counts.CRITICAL * 25 + counts.HIGH * 10 + counts.MEDIUM * 3 + counts.LOW * 1);
+
+            const emoji = score >= 75 ? '🔴' : score >= 40 ? '🟡' : '🟢';
+            const badge = score >= 75 ? 'CRITICAL' : score >= 40 ? 'AT RISK' : 'SECURE';
+
+            let table = '';
+            if (findings.length > 0) {
+              const top10 = findings
+                .sort((a,b) => (['CRITICAL','HIGH','MEDIUM','LOW'].indexOf(a.severity)) -
+                               (['CRITICAL','HIGH','MEDIUM','LOW'].indexOf(b.severity)))
+                .slice(0, 10);
+
+              table = '\n\n| Severity | Rule | Title | File:Line |\n|---|---|---|---|\n';
+              top10.forEach(f => {
+                const icon = f.severity === 'CRITICAL' ? '🔴' :
+                             f.severity === 'HIGH' ? '🟠' :
+                             f.severity === 'MEDIUM' ? '🟡' : '🔵';
+                const file = f.file.replace('./', '').split('/').pop();
+                table += `| ${icon} ${f.severity} | \`${f.rule_id}\` | ${f.title} | \`${file}:${f.line}\` |\n`;
+              });
+
+              if (findings.length > 10) {
+                table += `| ... | ... | and ${findings.length - 10} more | ... |\n`;
+              }
+            }
+
+            const body = `## ${emoji} QSEC Quantum Security Report — ${badge}
+
+            | Metric | Value |
+            |---|---|
+            | **Quantum Risk Score** | ${score}/100 |
+            | 🔴 Critical | ${counts.CRITICAL} |
+            | 🟠 High | ${counts.HIGH} |
+            | 🟡 Medium | ${counts.MEDIUM} |
+            | 🔵 Low | ${counts.LOW} |
+            | **Total Findings** | ${findings.length} |
+
+            ${findings.length === 0
+              ? '✅ **No cryptographic vulnerabilities detected.** This PR is quantum-safe.'
+              : table
+            }
+
+            <details>
+            <summary>What is the Quantum Risk Score?</summary>
+
+            The Quantum Risk Score (0-100) measures how vulnerable your codebase is to quantum computer attacks.
+            - **0-39**: Secure — no critical/high issues
+            - **40-74**: At Risk — has HIGH findings requiring migration
+            - **75-100**: Critical — has CRITICAL findings, immediate action required
+
+            Powered by [QSEC v3](https://github.com/yourorg/qsec) — Post-Quantum Cryptographic Firewall
+            </details>`;
+
+            // Delete old QSEC comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            for (const comment of comments) {
+              if (comment.body.includes('QSEC Quantum Security Report')) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  # ─── Supply Chain Hardening ─────────────────────────────────────────────────
+  supply-chain:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    needs: build-engine
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: qsec-linux-amd64
+          path: /tmp/qsec-bin
+
+      - name: Run full supply chain pipeline
+        run: |
+          chmod +x /tmp/qsec-bin/qsec
+          sudo mv /tmp/qsec-bin/qsec /usr/local/bin/qsec
+
+          mkdir -p qsec-out
+          qsec pipeline . --out-dir ./qsec-out
+
+          echo "=== Supply Chain Report ==="
+          ls -la qsec-out/
+
+      - name: Upload supply chain artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-artifacts
+          path: qsec-out/
+          retention-days: 90
+
+  # ─── Release ────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-engine, security-scan, supply-chain]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: qsec-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Download supply chain artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: supply-chain-artifacts
+          path: dist/supply-chain/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/qsec-linux-amd64/qsec
+            dist/qsec-macos-amd64/qsec
+            dist/qsec-windows-amd64.exe/qsec.exe
+            dist/supply-chain/*.json
+          body: |
+            ## QSEC ${{ github.ref_name }}
+
+            Post-Quantum Cryptographic Firewall release.
+
+            ### Installation
+            ```bash
+            curl -sfL https://github.com/yourorg/qsec/releases/download/${{ github.ref_name }}/qsec-linux-amd64 \
+              -o /usr/local/bin/qsec && chmod +x /usr/local/bin/qsec
+            ```
+
+            ### Verify (PQC Signature)
+            ```bash
+            qsec verify /usr/local/bin/qsec \
+              --manifest https://github.com/yourorg/qsec/releases/download/${{ github.ref_name }}/qsec-linux-amd64.qsec.json
+            ```
+          draft: false
+          prerelease: false

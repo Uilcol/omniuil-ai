@@ -1,0 +1,184 @@
+name: QSEC Release — Signed Production Binaries
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write   # OIDC for SLSA provenance
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  # Build production binary for each platform (liboqs enabled)
+  # ──────────────────────────────────────────────────────────────────────
+  build-release:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            artifact: qsec-linux-x86_64
+          - target: x86_64-apple-darwin
+            runner: macos-14
+            artifact: qsec-macos-x86_64
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            artifact: qsec-macos-aarch64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install liboqs (Linux)
+        if: contains(matrix.runner, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libssl-dev
+          git clone --depth 1 --branch 0.11.0 \
+            https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs
+          cmake -S /tmp/liboqs -B /tmp/liboqs/build \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DOQS_ALGS_ENABLED="ML_KEM_1024;ML_DSA_87" \
+            -DBUILD_SHARED_LIBS=OFF
+          sudo cmake --build /tmp/liboqs/build --parallel
+          sudo cmake --install /tmp/liboqs/build
+
+      - name: Install liboqs (macOS)
+        if: contains(matrix.runner, 'macos')
+        run: |
+          brew install cmake ninja openssl
+          git clone --depth 1 --branch 0.11.0 \
+            https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs
+          cmake -S /tmp/liboqs -B /tmp/liboqs/build \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DOQS_ALGS_ENABLED="ML_KEM_1024;ML_DSA_87" \
+            -DBUILD_SHARED_LIBS=OFF
+          cmake --build /tmp/liboqs/build --parallel
+          sudo cmake --install /tmp/liboqs/build
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build production binary
+        working-directory: qsec-rust
+        run: |
+          OQS_DIR=/usr/local \
+          PKG_CONFIG_PATH=/usr/local/lib/pkgconfig \
+          cargo build --release --features liboqs --target ${{ matrix.target }}
+
+      - name: Self-test binary
+        working-directory: qsec-rust
+        run: |
+          ./target/${{ matrix.target }}/release/qsec info
+          echo "✓ Binary works on ${{ matrix.target }}"
+
+      - name: Sign binary with QSEC
+        working-directory: qsec-rust
+        run: |
+          ./target/${{ matrix.target }}/release/qsec sign \
+            ./target/${{ matrix.target }}/release/qsec \
+            --out qsec-${{ matrix.artifact }}.qsec.json
+          echo "✓ Binary signed with Ed25519 + ML-DSA-87"
+
+      - name: Generate SBOM
+        working-directory: qsec-rust
+        run: |
+          ./target/${{ matrix.target }}/release/qsec sbom . \
+            --out qsec-${{ matrix.artifact }}.sbom.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            qsec-rust/target/${{ matrix.target }}/release/qsec
+            qsec-rust/qsec-${{ matrix.artifact }}.qsec.json
+            qsec-rust/qsec-${{ matrix.artifact }}.sbom.json
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Create GitHub Release with all artifacts
+  # ──────────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-24.04
+    needs: [build-release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Package release bundles
+        run: |
+          TAG=${{ github.ref_name }}
+          for plat in qsec-linux-x86_64 qsec-macos-x86_64 qsec-macos-aarch64; do
+            if [ -d "artifacts/$plat" ]; then
+              cp artifacts/$plat/qsec qsec-binary-$plat
+              zip -j qsec-$TAG-$plat.zip \
+                artifacts/$plat/qsec \
+                artifacts/$plat/*.qsec.json \
+                artifacts/$plat/*.sbom.json \
+                README.md 2>/dev/null || true
+              sha3sum qsec-$TAG-$plat.zip > qsec-$TAG-$plat.zip.sha3 2>/dev/null || \
+              sha256sum qsec-$TAG-$plat.zip > qsec-$TAG-$plat.zip.sha256
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: QSEC ${{ github.ref_name }} — Post-Quantum Cryptographic Firewall
+          body: |
+            ## QSEC ${{ github.ref_name }}
+
+            ### What's included
+            - **qsec binary** — compiled with liboqs (real ML-KEM-1024 + ML-DSA-87)
+            - **QSEC signature** — binary signed with Ed25519 + ML-DSA-87
+            - **SBOM** — CycloneDX 1.5 JSON
+
+            ### Verify the binary
+            ```bash
+            # Verify download integrity
+            sha256sum --check *.sha256
+
+            # Verify PQC signature
+            qsec verify ./qsec --manifest qsec-*.qsec.json
+            ```
+
+            ### Quick start
+            ```bash
+            # Scan your project
+            qsec scan ./src --fail-on-critical
+
+            # Generate SBOM
+            qsec sbom . --out sbom.cyclonedx.json
+
+            # Issue PQC-JWT
+            qsec token issue --subject user@example.com --ttl 3600
+            ```
+
+            ### Algorithms
+            | Component | Algorithm | Standard |
+            |-----------|-----------|---------|
+            | KEM | X25519 + ML-KEM-1024 | NIST FIPS 203 |
+            | DSA | Ed25519 + ML-DSA-87 | NIST FIPS 204 |
+            | Symmetric | AES-256-GCM | NIST |
+            | KDF | HKDF-SHA3-256 | RFC 5869 |
+          files: |
+            qsec-${{ github.ref_name }}-*.zip
+            qsec-${{ github.ref_name }}-*.sha256
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}

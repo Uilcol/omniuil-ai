@@ -1,0 +1,153 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# QSEC — Regras Customizadas PQC (OmniUil AI — Language Adapter)
+# Arquivo: .qsec/rules/pqc-custom.yaml
+#
+# Estas regras complementam as 14 regras builtin do QSEC com detecções
+# mais específicas para bibliotecas e frameworks comuns no Brasil.
+#
+# Formato suportado:
+#   id:             Identificador único (ex: "CUSTOM-001")
+#   severity:       CRITICAL | HIGH | MEDIUM | LOW
+#   title:          Título curto (exibido no relatório)
+#   description:    Explicação detalhada do problema
+#   recommendation: Ação de correção específica
+#   pattern:        Expressão regular (Rust regex syntax)
+#   languages:      Lista de linguagens [python, java, go, etc.] — vazio = todas
+#   taint_sink:     true = marca como sink para análise de taint
+# ─────────────────────────────────────────────────────────────────────────────
+
+rules:
+
+  # ── Python — bibliotecas comuns no Brasil ──────────────────────────────────
+
+  - id: "CUSTOM-PY-001"
+    severity: "CRITICAL"
+    title: "passlib com MD5 ou SHA-1 detectado"
+    description: >
+      passlib.hash.md5_crypt ou sha1_crypt usam algoritmos quebrados.
+      Comum em sistemas legados Python/Django.
+    recommendation: >
+      Use passlib.hash.argon2 ou passlib.hash.bcrypt.
+      Para novos sistemas: use hashlib.sha3_256 diretamente.
+    pattern: "passlib\\.hash\\.(?:md5|sha1|des)_crypt|CryptContext.*(?:md5|sha1)_crypt"
+    languages: ["python"]
+    taint_sink: false
+
+  - id: "CUSTOM-PY-002"
+    severity: "HIGH"
+    title: "Flask-JWT sem algoritmo explícito"
+    description: >
+      flask_jwt_extended sem especificação de JWT_ALGORITHM usa HS256 por padrão.
+      HS256 usa HMAC simétrico — sem non-repudiation e vulnerável a quânticos.
+    recommendation: >
+      Configure JWT_ALGORITHM = 'EdDSA' no mínimo.
+      Use QSEC PQC-JWT para conformidade CNSA 2.0.
+    pattern: "flask_jwt_extended|from flask_jwt_extended import|JWT_SECRET_KEY\\s*="
+    languages: ["python"]
+    taint_sink: true
+
+  - id: "CUSTOM-PY-003"
+    severity: "MEDIUM"
+    title: "Uso de secrets.token_hex sem tamanho suficiente"
+    description: >
+      secrets.token_hex(8) ou token_hex(4) gera apenas 64 ou 32 bits de entropia —
+      insuficiente para chaves criptográficas (mínimo recomendado: 256 bits = 32 bytes).
+    recommendation: >
+      Use secrets.token_bytes(32) para 256 bits de entropia.
+    pattern: "secrets\\.token_(?:hex|bytes|urlsafe)\\s*\\(\\s*(?:[0-9]|1[0-5])\\s*\\)"
+    languages: ["python"]
+    taint_sink: false
+
+  # ── Java — Spring Security / Bouncy Castle ────────────────────────────────
+
+  - id: "CUSTOM-JV-001"
+    severity: "CRITICAL"
+    title: "Spring Security com RSA ou ECDSA (JWT)"
+    description: >
+      RsaKeyConverts, RsaJwk ou JwtDecoder com RS256/RS384/RS512 usa RSA —
+      vulnerável ao algoritmo de Shor em hardware quântico.
+    recommendation: >
+      Migre para EdDSA como primeiro passo, depois para ML-DSA via Bouncy Castle PQC.
+    pattern: "RsaKeyConverts\\b|NimbusJwtDecoder\\.withPublicKey|RS(?:256|384|512)"
+    languages: ["java"]
+    taint_sink: true
+
+  - id: "CUSTOM-JV-002"
+    severity: "HIGH"
+    title: "BCrypt com work factor baixo"
+    description: >
+      BCryptPasswordEncoder(strength) com strength < 12 pode ser
+      quebrado por hardware moderno. Mínimo recomendado: 12.
+    recommendation: >
+      Use new BCryptPasswordEncoder(12) ou Argon2PasswordEncoder.
+    pattern: "new\\s+BCryptPasswordEncoder\\s*\\(\\s*(?:[0-9]|1[01])\\s*\\)"
+    languages: ["java"]
+    taint_sink: false
+
+  # ── Go — padrões comuns ───────────────────────────────────────────────────
+
+  - id: "CUSTOM-GO-001"
+    severity: "HIGH"
+    title: "golang.org/x/crypto/bcrypt com custo baixo"
+    description: >
+      bcrypt.GenerateFromPassword com cost < 12 é insuficiente para
+      proteção contra ataques de força bruta modernos.
+    recommendation: >
+      Use bcrypt.GenerateFromPassword(hash, 12) ou superior.
+      Para novos sistemas, prefira argon2.IDKey do golang.org/x/crypto/argon2.
+    pattern: "bcrypt\\.GenerateFromPassword\\s*\\([^,]+,\\s*(?:[0-9]|1[01])\\s*\\)"
+    languages: ["go"]
+    taint_sink: false
+
+  # ── JavaScript / TypeScript ───────────────────────────────────────────────
+
+  - id: "CUSTOM-JS-001"
+    severity: "CRITICAL"
+    title: "CryptoJS (biblioteca vulnerável) detectado"
+    description: >
+      CryptoJS usa implementações antigas de AES/MD5/SHA1/DES que não
+      foram auditadas para uso em produção e têm vulnerabilidades conhecidas.
+    recommendation: >
+      Use a Web Crypto API nativa (crypto.subtle) ou libsodium.js.
+    pattern: "require\\s*\\(['\"]crypto-js['\"]\\)|import.*from\\s*['\"]crypto-js['\"]|CryptoJS\\."
+    languages: ["javascript", "typescript"]
+    taint_sink: false
+
+  - id: "CUSTOM-JS-002"
+    severity: "HIGH"
+    title: "jose / jsonwebtoken sem verificação de algoritmo"
+    description: >
+      jwt.verify() sem especificar algorithms: [] aceita qualquer algoritmo,
+      incluindo 'none' — vulnerabilidade crítica de JWT.
+    recommendation: >
+      Sempre especifique: jwt.verify(token, secret, { algorithms: ['EdDSA'] }).
+    pattern: "jwt\\.verify\\s*\\([^)]+\\)"
+    languages: ["javascript", "typescript"]
+    taint_sink: true
+
+  # ── Rust — padrões específicos ────────────────────────────────────────────
+
+  - id: "CUSTOM-RS-001"
+    severity: "HIGH"
+    title: "rand::thread_rng para geração de chaves"
+    description: >
+      thread_rng é adequado para simulações mas NÃO recomendado para
+      material criptográfico — use OsRng explicitamente.
+    recommendation: >
+      Use rand_core::OsRng ou getrandom::getrandom() para bytes criptográficos.
+    pattern: "thread_rng\\s*\\(\\)|rand::thread_rng"
+    languages: ["rust"]
+    taint_sink: false
+
+  - id: "CUSTOM-RS-002"
+    severity: "MEDIUM"
+    title: "Uso de openssl crate sem configuração segura"
+    description: >
+      openssl bindings sem configuração explícita podem negociar
+      TLS 1.0/1.1 ou usar algoritmos legados.
+    recommendation: >
+      Configure SslConnector com set_min_proto_version(Some(SslVersion::TLS1_3))
+      e desabilite suites de cifras legadas explicitamente.
+    pattern: "SslConnector::builder|SslMethod::tls\\b|SslContext::builder"
+    languages: ["rust"]
+    taint_sink: false

@@ -1,0 +1,38 @@
+# QSEC Multi-Agent System — Dependências Python
+# Core (obrigatório)
+rich>=13.0.0
+pydantic>=2.0.0
+watchdog>=4.0.0
+
+# ── Provedores LLM — instale APENAS o que for usar ──────────────────────────
+
+# Anthropic Claude (padrão atual)
+# export LLM_PROVIDER=anthropic
+# export ANTHROPIC_API_KEY=sk-ant-...
+anthropic>=0.40.0
+
+# OpenAI GPT-4o
+# export LLM_PROVIDER=openai
+# export OPENAI_API_KEY=sk-...
+# pip install openai>=1.30.0
+
+# Google Gemini
+# export LLM_PROVIDER=gemini
+# export GEMINI_API_KEY=...
+# pip install google-generativeai>=0.5.0
+
+# Groq (free tier — Llama 3.1 grátis)
+# export LLM_PROVIDER=groq
+# export GROQ_API_KEY=gsk_...
+# pip install groq>=0.9.0
+
+# AWS Bedrock (Claude/Llama via AWS — dados ficam na sua conta AWS)
+# export LLM_PROVIDER=bedrock
+# export AWS_DEFAULT_REGION=us-east-1
+# pip install boto3>=1.34.0
+
+# Ollama (local, GRATUITO, PRIVADO — zero dependência externa)
+# export LLM_PROVIDER=ollama
+# Instalar: curl -fsSL https://ollama.com/install.sh | sh
+# Modelo:   ollama pull llama3.1:8b  (ou qwen2.5:14b para melhor qualidade)
+# Sem pip install — usa apenas stdlib urllib

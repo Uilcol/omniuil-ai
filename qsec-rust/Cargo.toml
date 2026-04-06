@@ -1,0 +1,115 @@
+[package]
+name        = "qsec"
+version     = "3.3.0"
+edition     = "2021"
+authors     = ["QSEC Team"]
+description = "Post-Quantum Cryptographic Firewall for Software"
+license     = "MIT"
+repository  = "https://github.com/SEU_USUARIO/qsec"
+keywords    = ["post-quantum", "cryptography", "pqc", "security", "supply-chain"]
+categories  = ["cryptography", "command-line-utilities"]
+
+[[bin]]
+name = "qsec"
+path = "src/main.rs"
+
+[lib]
+name = "qsec"
+path = "src/lib.rs"
+
+# ─── Dependências Principais ──────────────────────────────────────────────────
+
+[dependencies]
+
+# PQC real (NIST FIPS 203/204) — via liboqs C bindings
+# Ative com: cargo build --features liboqs
+oqs = { version = "0.9", optional = true }
+
+# Criptografia clássica auditada (dalek-cryptography)
+ed25519-dalek  = { version = "2",    features = ["zeroize", "rand_core"] }
+x25519-dalek   = { version = "2",    features = ["zeroize", "static_secrets"] }
+
+# Criptografia simétrica auditada (RustCrypto)
+aes-gcm        = { version = "0.10", features = ["aes"] }
+hkdf           = "0.12"
+sha2           = "0.10"
+sha3           = "0.10"
+hmac           = "0.12"
+
+# Segurança de memória — zeroiza chaves no Drop automaticamente
+zeroize        = { version = "1.8",  features = ["derive", "zeroize_derive"] }
+
+# Comparações em tempo constante — evita timing attacks
+subtle         = "2.6"
+
+# Entropia segura — OsRng em todas as plataformas
+rand           = { version = "0.8",  features = ["getrandom"] }
+rand_core      = { version = "0.6",  features = ["getrandom"] }
+
+# Serialização
+serde          = { version = "1",    features = ["derive"] }
+serde_json     = "1"
+base64         = { version = "0.22", features = ["alloc"] }
+hex            = { version = "0.4",  features = ["serde"] }
+
+# Tratamento de erros idiomático
+thiserror      = "2"
+
+# Timestamps e tempo
+chrono         = { version = "0.4",  features = ["serde"] }
+
+# UUIDs para JTI
+uuid           = { version = "1",    features = ["v4"] }
+
+# CLI de nível profissional
+clap           = { version = "4",    features = ["derive", "color", "env"] }
+
+# Regex para o scanner
+regex          = "1"
+lazy_static    = "1"
+
+# SHA3 para hashes de artefatos e API keys
+digest         = "0.10"
+
+# Geração de bytes aleatórios seguros
+getrandom      = "0.2"
+
+# Configuração enterprise (.qsec.toml)
+toml           = "0.8"
+
+# Glob patterns para ignore_paths no scanner
+glob           = "0.3"
+
+# YAML — carregamento de regras customizadas (.qsec/rules/*.yaml)
+serde_yaml     = "0.9"
+
+[dev-dependencies]
+tempfile       = "3"
+assert_matches = "1.5"
+
+# ─── Feature Flags ────────────────────────────────────────────────────────────
+
+[features]
+default  = []
+
+# Ativa ML-KEM/ML-DSA reais via liboqs
+# Requer: apt-get install liboqs-dev  (ou brew install liboqs)
+liboqs   = ["dep:oqs"]
+
+# Inclui benchmarks
+bench    = []
+
+# ─── Perfis ───────────────────────────────────────────────────────────────────
+
+[profile.release]
+opt-level     = 3
+lto           = true      # Link-Time Optimization
+codegen-units = 1         # máxima otimização
+strip         = true      # remove símbolos de debug
+panic         = "abort"   # binários menores, sem stack unwinding
+
+[profile.dev]
+opt-level = 1             # otimização mínima para builds rápidos
+
+[profile.test]
+opt-level = 1

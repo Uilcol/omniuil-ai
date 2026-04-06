@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSEC — Bem-vindo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0a0f1e;
+  --panel:   #0f1629;
+  --border:  #1e2d4a;
+  --border2: #2a3f66;
+  --blue:    #3b82f6;
+  --blue2:   #60a5fa;
+  --green:   #10b981;
+  --green2:  #34d399;
+  --amber:   #f59e0b;
+  --text:    #e2e8f0;
+  --muted:   #64748b;
+  --mono:    'JetBrains Mono', monospace;
+  --sans:    'Inter', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mesh gradient background */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(59,130,246,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(16,185,129,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 60% 30%, rgba(99,102,241,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.container {
+  position: relative; z-index: 1;
+  max-width: 860px; margin: 0 auto;
+  padding: 48px 24px;
+}
+
+/* ── Header ── */
+.logo {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 48px;
+}
+.logo-mark {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--blue), var(--green));
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 20px; font-weight: 500;
+  color: white; letter-spacing: -1px;
+  box-shadow: 0 0 30px rgba(59,130,246,0.3);
+}
+.logo-text { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+.logo-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.hero { margin-bottom: 48px; }
+.hero h1 {
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: 700; line-height: 1.2;
+  letter-spacing: -1px; margin-bottom: 16px;
+}
+.hero h1 span { color: var(--blue2); }
+.hero p { font-size: 17px; color: var(--muted); line-height: 1.7; max-width: 560px; }
+
+/* ── Status cards ── */
+.status-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; margin-bottom: 40px;
+}
+.status-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-checking { background: var(--amber); animation: pulse 1.5s ease-in-out infinite; }
+.dot-ok       { background: var(--green); }
+.dot-warn     { background: var(--amber); }
+.dot-err      { background: #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.status-label { font-size: 12px; color: var(--muted); }
+.status-value { font-size: 13px; font-weight: 500; margin-top: 1px; }
+
+/* ── Steps ── */
+.steps { display: flex; flex-direction: column; gap: 4px; margin-bottom: 40px; }
+.step {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 24px;
+  display: flex; gap: 20px; align-items: flex-start;
+  transition: border-color 0.2s;
+}
+.step:hover { border-color: var(--border2); }
+.step.active { border-color: var(--blue); background: rgba(59,130,246,0.04); }
+.step.done   { border-color: var(--green); opacity: 0.7; }
+.step-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  flex-shrink: 0; transition: all 0.2s;
+}
+.step.active .step-num { border-color: var(--blue); color: var(--blue2); }
+.step.done   .step-num { border-color: var(--green); color: var(--green2); background: rgba(16,185,129,0.1); }
+.step-content { flex: 1; }
+.step-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.step-desc  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.step-code {
+  margin-top: 10px; padding: 10px 14px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--mono); font-size: 12px; color: #93c5fd;
+  cursor: pointer; user-select: all;
+  transition: border-color 0.15s;
+}
+.step-code:hover { border-color: var(--blue); }
+
+/* ── Feature grid ── */
+.features {
+  display: grid; grid-template-columns: repeat(2,1fr);
+  gap: 12px; margin-bottom: 40px;
+}
+.feature {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px 20px;
+}
+.feature-icon { font-size: 22px; margin-bottom: 8px; }
+.feature-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.feature-desc  { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ── CTA ── */
+.cta {
+  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(16,185,129,0.08));
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 14px; padding: 32px;
+  text-align: center; margin-bottom: 32px;
+}
+.cta h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.cta p  { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; border-radius: 8px; font-size: 14px;
+  font-weight: 600; text-decoration: none; border: none; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-primary {
+  background: var(--blue); color: white;
+  box-shadow: 0 0 20px rgba(59,130,246,0.3);
+}
+.btn-primary:hover { background: var(--blue2); transform: translateY(-1px); }
+.btn-ghost {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border2);
+}
+.btn-ghost:hover { border-color: var(--blue); color: var(--blue2); }
+.btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ── Privacy badge ── */
+.privacy {
+  display: flex; align-items: center; justify-content: center;
+  gap: 24px; padding: 16px; flex-wrap: wrap;
+}
+.privacy-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.privacy-item span { color: var(--green2); }
+
+/* Notification */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  background: var(--green); color: white;
+  padding: 10px 18px; border-radius: 8px;
+  font-size: 13px; font-weight: 500;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-mark">Q</div>
+    <div>
+      <div class="logo-text">QSEC Enterprise</div>
+      <div class="logo-sub">Post-Quantum Cryptographic Firewall v3.2.1</div>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Bem-vindo ao <span>QSEC</span>.<br>Vamos começar em 2 minutos.</h1>
+    <p>Detecte, analise e corrija automaticamente vulnerabilidades criptográficas no seu código antes que computadores quânticos as explorem. Tudo rodando localmente — nenhum dado sai desta máquina.</p>
+  </div>
+
+  <!-- Status -->
+  <div class="status-grid">
+    <div class="status-card">
+      <div class="status-dot dot-checking" id="dot-api"></div>
+      <div>
+        <div class="status-label">QSEC Engine</div>
+        <div class="status-value" id="val-api">Verificando...</div>
+      </div>
+    </div>
+    <div class="status-card">
+      <div class="status-dot dot-checking" id="dot-ollama"></div>
+      <div>
+        <div class="status-label">Modelo de IA</div>
+        <div class="status-value" id="val-ollama">Verificando...</div>
+      </div>
+    </div>
+    <div class="status-card">
+      <div class="status-dot dot-checking" id="dot-pqc"></div>
+      <div>
+        <div class="status-label">PQC (ML-KEM + ML-DSA)</div>
+        <div class="status-value" id="val-pqc">Verificando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps">
+
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Conectar ao Dashboard</div>
+        <div class="step-desc">
+          Acesse a interface principal. Use a senha gerada durante a instalação
+          (salva em <code>~/.qsec/ACESSO.txt</code> ou <code>%USERPROFILE%\.qsec\ACESSO.txt</code>).
+        </div>
+        <div class="step-code" onclick="copyCode(this)">http://localhost:8080</div>
+      </div>
+    </div>
+
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Apontar para o seu projeto</div>
+        <div class="step-desc">
+          Edite o arquivo <code>.env</code> no diretório de instalação e defina
+          <code>SCAN_TARGET</code> apontando para a pasta do seu projeto.
+          Depois reinicie com o comando abaixo.
+        </div>
+        <div class="step-code" onclick="copyCode(this)">SCAN_TARGET=/caminho/do/seu/projeto</div>
+      </div>
+    </div>
+
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Executar o primeiro scan</div>
+        <div class="step-desc">
+          No dashboard, clique em <strong>New Scan</strong>, selecione
+          <code>/scan-target</code> e inicie. O QSEC analisa automaticamente e
+          calcula o Quantum Risk Score do seu projeto.
+        </div>
+      </div>
+    </div>
+
+    <div class="step" id="step4">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Auditoria com IA (opcional)</div>
+        <div class="step-desc">
+          Clique em <strong>AI Audit</strong> para ativar os 5 agentes autônomos.
+          Eles analisam os findings, calculam o risco real, sugerem patches e geram
+          um roadmap de migração priorizado.
+          O modelo <span id="model-name">Ollama</span> roda 100% nesta máquina.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Features -->
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🔍</div>
+      <div class="feature-title">14 Regras de Detecção</div>
+      <div class="feature-desc">RSA, ECDSA, ECDH, MD5, SHA-1, DES, RC4, JWT none, hardcoded keys, weak PRNG e mais. Suporte a Rust, Python, JS, Java, Go, C/C++.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-title">5 Agentes IA Autônomos</div>
+      <div class="feature-desc">Scanner, Analysis, Remediation, Monitoring e Incident. Trabalham em conjunto para detectar, analisar e corrigir automaticamente.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-title">PQC Real — NIST FIPS 203/204</div>
+      <div class="feature-desc">ML-KEM-1024 + ML-DSA-87. Nível 5 de segurança NIST — o máximo disponível. Proteção contra ataques de computadores quânticos.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📋</div>
+      <div class="feature-title">SBOM + Relatório</div>
+      <div class="feature-desc">Gera SBOM CycloneDX 1.5 assinado com ML-DSA-87, relatório SARIF para GitHub Code Scanning, e relatório executivo em PDF.</div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h2>Pronto para começar</h2>
+    <p>O dashboard completo tem todas as funcionalidades. Esta página é apenas o guia de início rápido.</p>
+    <div class="btn-row">
+      <a href="/" class="btn btn-primary">→ Abrir Dashboard</a>
+      <a href="https://github.com/SEU_USUARIO/qsec" target="_blank" class="btn btn-ghost">Documentação</a>
+    </div>
+  </div>
+
+  <!-- Privacy -->
+  <div class="privacy">
+    <div class="privacy-item"><span>🔒</span> 100% local — zero dados externos</div>
+    <div class="privacy-item"><span>💰</span> Modelo IA gratuito (Ollama)</div>
+    <div class="privacy-item"><span>⚡</span> ML-KEM-1024 + ML-DSA-87</div>
+    <div class="privacy-item"><span>🦀</span> Zero unsafe code (Rust)</div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast">Copiado!</div>
+
+<script>
+// ── Status check ──────────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const r = await fetch('/health', { signal: AbortSignal.timeout(4000) });
+    const d = await r.json();
+
+    // API online
+    setStatus('api', 'ok', 'Online — v' + (d.version || '3.2.1'));
+
+    // PQC
+    const pqc = d.pqc_compliant || d.nist_pqc_compliant;
+    setStatus('pqc', pqc ? 'ok' : 'warn', pqc ? 'ML-KEM-1024 + ML-DSA-87' : 'Modo referência');
+
+    // Tentar checar Ollama via engine info
+    try {
+      const r2 = await fetch('/api/v1/engine/info', { signal: AbortSignal.timeout(4000) });
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const provider = (d2?.data?.llm_provider || 'Ollama').toUpperCase();
+        const model    = d2?.data?.ollama_model || document.getElementById('model-name').textContent;
+        setStatus('ollama', 'ok', provider + ' — ' + model);
+        document.getElementById('model-name').textContent = model;
+      } else { throw new Error(); }
+    } catch {
+      // Ollama pode ainda estar baixando o modelo
+      setStatus('ollama', 'warn', 'Iniciando modelo de IA...');
+      setTimeout(checkStatus, 8000);
+    }
+  } catch {
+    setStatus('api', 'err', 'Offline — aguardando...');
+    setStatus('pqc', 'checking', '—');
+    setStatus('ollama', 'checking', '—');
+    setTimeout(checkStatus, 5000);
+  }
+}
+
+function setStatus(key, state, text) {
+  const dot = document.getElementById('dot-' + key);
+  const val = document.getElementById('val-' + key);
+  dot.className = 'status-dot dot-' + state;
+  val.textContent = text;
+}
+
+// ── Copy code blocks ──────────────────────────────────────────────────────────
+function copyCode(el) {
+  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkStatus();
+</script>
+</body>
+</html>
