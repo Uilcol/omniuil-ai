@@ -1,0 +1,29 @@
+# Rust build
+qsec-rust/target/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Banco de dados e dados locais
+*.db
+*.db-wal
+*.db-shm
+qsec-enterprise/data/
+
+# Credenciais e configuração local
+.env
+ACESSO.txt
+~/.qsec/
+
+# Docker volumes
+qsec-alerts/
+qsec-backups/
+
+# IDE
+.vscode/
+.idea/
+*.swp

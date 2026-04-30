@@ -151,14 +151,14 @@ JWT:  PQC-JWT                (Tokens pós-quânticos)
 
 ### Linux / macOS / WSL2
 ```bash
-git clone https://github.com/Uilcol/qsec.git
+git clone https://github.com/Uilcol/omniuil-ai.git
 cd qsec/qsec-enterprise
 bash install.sh
 ```
 
 ### Windows (PowerShell Admin)
 ```powershell
-git clone https://github.com/Uilcol/qsec.git
+git clone https://github.com/Uilcol/omniuil-ai.git
 cd qsec\qsec-enterprise
 .\install.ps1
 ```
@@ -336,4 +336,4 @@ MIT License — veja [LICENSE](LICENSE)
 ## Contato
 
 Projeto desenvolvido no Brasil 🇧🇷  
-Repositório: [github.com/Uilcol/qsec](https://github.com/Uilcol/qsec)
+Repositório: [github.com/Uilcol/omniuil-ai](https://github.com/Uilcol/omniuil-ai)

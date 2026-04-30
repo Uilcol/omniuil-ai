@@ -10,11 +10,11 @@ keywords    = ["post-quantum", "cryptography", "pqc", "security", "supply-chain"
 categories  = ["cryptography", "command-line-utilities"]
 
 [[bin]]
-name = "qsec"
+name = "omniuil-ai"
 path = "src/main.rs"
 
 [lib]
-name = "qsec"
+name = "omniuil-ai"
 path = "src/lib.rs"
 
 # ─── Dependências Principais ──────────────────────────────────────────────────
