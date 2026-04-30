@@ -1,8 +1,8 @@
-# QSEC — Post-Quantum Cryptographic Firewall
+# OmniUil AI — Post-Quantum Cryptographic Firewall
 
 <div align="center">
 
-![QSEC](https://img.shields.io/badge/QSEC-v3.3.0-0A2540?style=for-the-badge&logo=shield&logoColor=3B82F6)
+![OmniUil AI](https://img.shields.io/badge/OmniUil AI-v3.3.0-0A2540?style=for-the-badge&logo=shield&logoColor=3B82F6)
 ![Rust](https://img.shields.io/badge/Rust-1.75+-CE422B?style=for-the-badge&logo=rust&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
@@ -33,14 +33,14 @@ Você quer: ML-KEM-1024     →  ✅ Seguro contra ameaças quânticas (NIST FIP
 
 ---
 
-## O que o QSEC faz
+## O que o OmniUil AI faz
 
 ```
-$ qsec scan ./meu-projeto --format text
+$ omniuil-ai scan ./meu-projeto --format text
 
-[QSEC v3.3.0] Backend: reference
+[OmniUil AI v3.3.0] Backend: reference
 ╔══════════════════════════════════════════════════════════════╗
-║         QSEC — Relatório de Análise Criptográfica  v3.3      ║
+║         OmniUil AI — Relatório de Análise Criptográfica  v3.3      ║
 ╚══════════════════════════════════════════════════════════════╝
   Scanner findings  : 7
   Taint findings    : 4
@@ -97,7 +97,7 @@ Regras específicas por linguagem para APIs nativas:
 Rastreia fluxo de dados externos até operações criptográficas:
 
 ```python
-# QSEC detecta este fluxo automaticamente:
+# OmniUil AI detecta este fluxo automaticamente:
 algoritmo = request.json.get("alg")        # ← fonte: HTTP request
 token = jwt.encode(data, key, algorithm=algoritmo)  # ← sink: JWT
 # ALERTA: atacante pode enviar {"alg": "none"} e bypassar verificação
@@ -107,7 +107,7 @@ token = jwt.encode(data, key, algorithm=algoritmo)  # ← sink: JWT
 Adicione regras sem recompilar:
 
 ```yaml
-# .qsec/rules/minhas-regras.yaml
+# .omniuil-ai/rules/minhas-regras.yaml
 rules:
   - id: "CUSTOM-001"
     severity: "CRITICAL"
@@ -152,19 +152,19 @@ JWT:  PQC-JWT                (Tokens pós-quânticos)
 ### Linux / macOS / WSL2
 ```bash
 git clone https://github.com/Uilcol/omniuil-ai.git
-cd qsec/qsec-enterprise
+cd omniuil-ai/omniuil-ai-enterprise
 bash install.sh
 ```
 
 ### Windows (PowerShell Admin)
 ```powershell
 git clone https://github.com/Uilcol/omniuil-ai.git
-cd qsec\qsec-enterprise
+cd omniuil-ai\omniuil-ai-enterprise
 .\install.ps1
 ```
 
 **Resultado:** Dashboard em `http://localhost:8080`  
-**Credenciais:** Salvas em `~/.qsec/ACESSO.txt`
+**Credenciais:** Salvas em `~/.omniuil-ai/ACESSO.txt`
 
 ### Pré-requisitos
 - Docker Desktop
@@ -177,25 +177,25 @@ cd qsec\qsec-enterprise
 
 ```bash
 # Compilar o engine
-cd qsec-rust && cargo build --release
+cd omniuil-ai-rust && cargo build --release
 
 # Escanear um projeto
-./target/release/qsec scan ./meu-projeto --format text
+./target/release/omniuil-ai scan ./meu-projeto --format text
 
 # Saída JSON (para CI/CD)
-./target/release/qsec scan ./meu-projeto --format json
+./target/release/omniuil-ai scan ./meu-projeto --format json
 
 # Saída SARIF (GitHub Code Scanning)
-./target/release/qsec scan ./meu-projeto --format sarif
+./target/release/omniuil-ai scan ./meu-projeto --format sarif
 
 # Gerar SBOM CycloneDX 1.5
-./target/release/qsec sbom ./meu-projeto
+./target/release/omniuil-ai sbom ./meu-projeto
 
 # Assinar artefato com PQC híbrido
-./target/release/qsec sign ./release.tar.gz
+./target/release/omniuil-ai sign ./release.tar.gz
 
 # Emitir PQC-JWT
-./target/release/qsec token issue --subject user@empresa.com --ttl 3600
+./target/release/omniuil-ai token issue --subject user@empresa.com --ttl 3600
 ```
 
 ---
@@ -225,8 +225,8 @@ curl http://localhost:8080/api/v1/scan/JOB_ID \
 
 ### GitHub Actions
 ```yaml
-- name: QSEC Security Scan
-  uses: Uilcol/qsec@v3.3.0
+- name: OmniUil AI Security Scan
+  uses: Uilcol/omniuil-ai@v3.3.0
   with:
     path: ./src
     fail-on: CRITICAL,HIGH
@@ -236,7 +236,7 @@ curl http://localhost:8080/api/v1/scan/JOB_ID \
 ### Docker
 ```bash
 # Iniciar
-cd ~/.qsec && docker compose up -d
+cd ~/.omniuil-ai && docker compose up -d
 
 # Parar
 docker compose down
@@ -254,9 +254,9 @@ docker compose pull && docker compose up -d
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   QSEC v3.3.0                       │
+│                   OmniUil AI v3.3.0                       │
 ├──────────────┬──────────────┬───────────────────────┤
-│  qsec-rust   │  qsec-agents │  qsec-enterprise      │
+│  omniuil-ai-rust   │  omniuil-ai-agents │  omniuil-ai-enterprise      │
 │  (Engine)    │  (IA Local)  │  (API + Dashboard)    │
 ├──────────────┼──────────────┼───────────────────────┤
 │ Scanner PQC  │ ScannerAgent │ API REST (22 endpoints)│
@@ -278,9 +278,9 @@ docker compose pull && docker compose up -d
 
 ---
 
-## Por que QSEC?
+## Por que OmniUil AI?
 
-| | QSEC | Semgrep | Snyk | SandboxAQ |
+| | OmniUil AI | Semgrep | Snyk | SandboxAQ |
 |---|---|---|---|---|
 | Detecção PQC | ✅ | ❌ | ❌ | ✅ |
 | Taint Analysis Crypto | ✅ | Parcial | ❌ | ❌ |
@@ -309,14 +309,14 @@ docker compose pull && docker compose up -d
 ## Gestão do Stack
 
 ```bash
-# Iniciar o QSEC
-cd ~/.qsec && docker compose up -d
+# Iniciar o OmniUil AI
+cd ~/.omniuil-ai && docker compose up -d
 
 # Ver status
 docker compose ps
 
 # Ver senha de acesso
-cat ~/.qsec/ACESSO.txt
+cat ~/.omniuil-ai/ACESSO.txt
 
 # Acessar dashboard
 # http://localhost:8080
