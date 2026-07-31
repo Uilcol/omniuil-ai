@@ -1,0 +1,68 @@
+OmniUil AI Enterprise License
+
+Copyright (c) 2026 OmniUil AI. All rights reserved.
+
+This license applies to the following components ("Enterprise Components"):
+  - qsec-enterprise/  (API REST, dashboard, multi-tenant orchestration)
+  - qsec-agents/      (AI agents: Scanner, Analysis, Remediation, Monitoring, Incident)
+
+The Enterprise Components are NOT open source. The core scanning engine
+(qsec-rust/) is separately licensed under Apache 2.0 — see qsec-rust/LICENSE.
+
+─────────────────────────────────────────────────────────────────────────────
+GRANT OF EVALUATION LICENSE
+─────────────────────────────────────────────────────────────────────────────
+
+You are granted a free, non-exclusive, non-transferable license to install,
+run, and evaluate the Enterprise Components under the following conditions:
+
+  1. NON-PRODUCTION USE: Personal projects, development, testing, security
+     research, academic use, and evaluation are permitted at no cost,
+     indefinitely.
+
+  2. PRODUCTION EVALUATION: You may run the Enterprise Components in a
+     production environment for up to 90 (ninety) days from first
+     deployment, free of charge, to evaluate fitness for your use case.
+
+  3. AFTER 90 DAYS: Continued production use requires a paid Commercial
+     License. Contact licensing@omniuil.ai or open an issue at
+     github.com/Uilcol/omniuil-ai for pricing.
+
+  4. COMPANIES UNDER 10 EMPLOYEES OR ANNUAL REVENUE UNDER R$ 500.000:
+     Production use is permitted free of charge indefinitely, provided
+     attribution ("Powered by OmniUil AI") is displayed in the product
+     or internal documentation.
+
+─────────────────────────────────────────────────────────────────────────────
+WHAT REQUIRES A COMMERCIAL LICENSE
+─────────────────────────────────────────────────────────────────────────────
+
+  - Production use by companies with 10+ employees or R$ 500.000+ annual
+    revenue, beyond the 90-day evaluation period
+  - Offering the Enterprise Components, in whole or modified form, as a
+    hosted or managed service to third parties
+  - Removing or obscuring OmniUil AI attribution/branding
+  - White-labeling or reselling under a different product name
+
+─────────────────────────────────────────────────────────────────────────────
+WHAT IS ALWAYS FREE
+─────────────────────────────────────────────────────────────────────────────
+
+  - Reading, studying, and modifying the source code for personal learning
+  - Contributing bug fixes and improvements via pull request
+  - Running qsec-rust (the scanning engine/CLI) — separately licensed
+    under Apache 2.0, unrestricted for any use including production
+  - Security research and responsible disclosure of vulnerabilities
+
+─────────────────────────────────────────────────────────────────────────────
+DISCLAIMER
+─────────────────────────────────────────────────────────────────────────────
+
+THE ENTERPRISE COMPONENTS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL OMNIUIL AI BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+─────────────────────────────────────────────────────────────────────────────
+
+For commercial licensing, enterprise support, or custom terms, contact:
+github.com/Uilcol/omniuil-ai
