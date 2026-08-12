@@ -27,3 +27,5 @@ qsec-backups/
 .vscode/
 .idea/
 *.swp
+*.pem
+*private_key*
