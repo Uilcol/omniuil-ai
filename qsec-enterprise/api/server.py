@@ -6,6 +6,7 @@ from functools import wraps
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "qsec-agents"))
 from flask import Flask, request, jsonify, Response, send_from_directory, stream_with_context
+from licensing import check_access, declare_company_size, install_license_key
 
 _RAW_SECRET = os.environ.get("QSEC_API_SECRET", "dev-secret-change-in-production")
 _DEFAULT_SECRET = "dev-secret-change-in-production"
@@ -473,6 +474,24 @@ def auth_token():
 @app.route("/api/"+API_VERSION+"/engine/info")
 @require_auth()
 def engine_info(): return jsonify(_run_qsec("info"))
+
+@app.route("/api/"+API_VERSION+"/license/status")
+def license_status():
+    return jsonify(check_access())
+
+@app.route("/api/"+API_VERSION+"/license/activate", methods=["POST"])
+def license_activate():
+    body = request.get_json(force=True, silent=True) or {}
+    ok, msg = install_license_key(body.get("license_key", ""))
+    if not ok:
+        return jsonify({"error": msg}), 400
+    return jsonify({"message": msg})
+
+@app.route("/api/"+API_VERSION+"/setup/company-size", methods=["POST"])
+def setup_company_size():
+    body = request.get_json(force=True, silent=True) or {}
+    result = declare_company_size(body.get("size", "1-9"))
+    return jsonify(result)
 
 @app.route("/api/"+API_VERSION+"/scan", methods=["POST"])
 @require_auth("scan")
