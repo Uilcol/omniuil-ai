@@ -151,3 +151,202 @@ rules:
     pattern: "SslConnector::builder|SslMethod::tls\\b|SslContext::builder"
     languages: ["rust"]
     taint_sink: false
+
+  - id: "QSC-100"
+    severity: "CRITICAL"
+    title: "Chave criptográfica hardcoded detectada"
+    description: >
+      Uma chave secreta (AES, HMAC, etc.) está embutida diretamente no código-fonte.
+      Exemplo clássico: Apache Shiro 1.2.4 (CVE-2016-4437) com chave AES padrão.
+    recommendation: >
+      Armazene chaves em um cofre de segredos (Vault, AWS KMS, variáveis de ambiente seguras).
+      Gere chaves aleatórias em tempo de execução.
+    pattern: "static\\s+final\\s+byte\\s*\\[\\s*\\]\\s+[A-Z_]+\\s*=\\s*Base64\\.decode\\("
+    languages: ["java"]
+    taint_sink: false
+
+
+  - id: "QSC-101"
+    severity: "CRITICAL"
+    title: "Uso de java.util.Random em contexto de segurança"
+    description: >
+      java.util.Random é previsível e não deve ser usado para gerar tokens,
+      senhas, chaves ou qualquer material criptográfico.
+    recommendation: >
+      Use java.security.SecureRandom ou, preferencialmente, um gerador
+      quântico-resistente se disponível.
+    pattern: "new\\s+Random\\s*\\(|java\\.util\\.Random"
+    languages: ["java"]
+    taint_sink: true
+
+  - id: "QSC-102"
+    severity: "CRITICAL"
+    title: "RSA com tamanho de chave inferior a 2048 bits"
+    description: >
+      Chaves RSA menores que 2048 bits são consideradas inseguras e
+      podem ser quebradas por atacantes com recursos moderados.
+    recommendation: >
+      Use RSA com 3072 ou 4096 bits, ou migre para ECDSA/EdDSA.
+    pattern: "KeyPairGenerator\\.getInstance\\(\"RSA\"\\).*initialize\\(\\s*(?:512|1024|2047)\\s*\\)"
+    languages: ["java"]
+    taint_sink: false
+
+  - id: "QSC-103"
+    severity: "CRITICAL"
+    title: "AES em modo ECB ou sem modo explícito"
+    description: >
+      AES no modo ECB não oferece confidencialidade real (padrões
+      repetidos permanecem visíveis). Usar "AES" sem especificar modo
+      também leva ao ECB em muitos provedores.
+    recommendation: >
+      Use AES-GCM ou AES-CBC com padding PKCS5. Explicite o modo:
+      Cipher.getInstance("AES/GCM/NoPadding").
+    pattern: "Cipher\\.getInstance\\(\\s*\"AES(?:/ECB)?\\s*\"\\s*\\)|AES/ECB"
+    languages: ["java"]
+    taint_sink: false
+
+  - id: "QSC-104"
+    severity: "HIGH"
+    title: "Protocolos TLS antigos (SSLv3, TLS 1.0, TLS 1.1)"
+    description: >
+      SSLv3, TLS 1.0 e TLS 1.1 são obsoletos e vulneráveis a ataques
+      como POODLE e BEAST. Devem ser desabilitados.
+    recommendation: >
+      Use TLS 1.2 ou TLS 1.3 como mínimo. Configure o servidor/client
+      para rejeitar versões anteriores.
+    pattern: "SSLv3|TLSv1\\.0|TLSv1\\.1|SSLContext\\.getInstance\\(\\s*\"SSL\\s*\""
+    languages: ["java"]
+    taint_sink: false
+
+  - id: "QSC-105"
+    severity: "HIGH"
+    title: "Uso de random module do Python para tokens/segredos"
+    description: >
+      A biblioteca random do Python é adequada para simulações, mas NÃO
+      para gerar tokens, senhas ou segredos criptográficos.
+    recommendation: >
+      Use secrets.token_hex, secrets.token_bytes ou os.urandom para
+      qualquer finalidade de segurança.
+    pattern: "random\\.(?:random|randint|randrange|choice|sample)\\s*\\("
+    languages: ["python"]
+    taint_sink: false
+
+  - id: "QSC-106"
+    severity: "HIGH"
+    title: "Uso de MD5 ou SHA-1 em Go"
+    description: >
+      Go ainda permite o uso de crypto/md5 e crypto/sha1, que são
+      algoritmos quebrados para segurança.
+    recommendation: >
+      Use golang.org/x/crypto/sha3 ou blake2b para novos sistemas.
+    pattern: "\"crypto/md5\"|\"crypto/sha1\"|md5\\.Sum|sha1\\.Sum"
+    languages: ["go"]
+    taint_sink: false
+
+  - id: "QSC-107"
+    severity: "HIGH"
+    title: "Uso de MD5 ou SHA-1 em Rust"
+    description: >
+      Crates como md-5 e sha1 fornecem funções de hash quebradas,
+      inadequadas para segurança.
+    recommendation: >
+      Use sha3 ou blake2 da crate digest.
+    pattern: "Md5::digest|Sha1::digest|md5::Md5|sha1::Sha1"
+    languages: ["rust"]
+    taint_sink: false
+
+  - id: "QSC-108"
+    severity: "CRITICAL"
+    title: "Possível segredo hardcoded (senha/chave em string)"
+    description: >
+      Strings longas com aparência de segredo (senha, token, chave)
+      embutidas diretamente no código são um risco grave.
+    recommendation: >
+      Remova o segredo e use um cofre (Vault, AWS Secrets Manager,
+      variáveis de ambiente). Revogue e rotacione qualquer segredo exposto.
+    pattern: "(?:password|passwd|pwd|secret|token|api_key)\\s*=\\s*\"[^\"]{12,}\""
+    languages: ["python", "java", "javascript", "typescript", "go", "rust"]
+    taint_sink: false
+
+
+  # ── Novas regras de alto valor (adicionadas em Aug 2026) ────────────────
+
+  - id: "QSC-110"
+    severity: "CRITICAL"
+    title: "MessageDigest com MD5 ou SHA-1 em Java"
+    description: >
+      MessageDigest.getInstance("MD5") ou "SHA-1" usa algoritmos
+      criptograficamente quebrados para hashing de segurança.
+    recommendation: >
+      Use MessageDigest.getInstance("SHA3-256") ou
+      MessageDigest.getInstance("SHA-256") (apenas para compatibilidade).
+    pattern: "MessageDigest\\.getInstance\\(\\s*\"(?:MD5|SHA-1|SHA1)\\s*\"\\s*\\)"
+    languages: ["java"]
+    taint_sink: true
+
+  - id: "QSC-111"
+    severity: "CRITICAL"
+    title: "KeyStore do Java com senha padrão 'changeit'"
+    description: >
+      O uso da senha padrão "changeit" ao carregar um keystore é amplamente
+      conhecido e permite que atacantes acessem chaves privadas se o
+      arquivo do keystore for comprometido.
+    recommendation: >
+      Gere uma senha forte e armazene-a em um cofre de segredos.
+      Nunca use "changeit" em produção.
+    pattern: "KeyStore\\.load\\([^,]+,\\s*\"changeit\"\\.toCharArray\\(\\)"
+    languages: ["java"]
+    taint_sink: false
+
+  - id: "QSC-112"
+    severity: "HIGH"
+    title: "Uso de SHA-1 em certificados ou assinaturas (Java)"
+    description: >
+      SHA1withRSA, SHA1withECDSA e outros usam SHA-1, que é vulnerável
+      a ataques de colisão e não deve ser usado para assinaturas.
+    recommendation: >
+      Use SHA256withRSA, SHA256withECDSA, ou melhor, EdDSA ou RSA-PSS.
+    pattern: "\"SHA1with(?:RSA|ECDSA|DSA)\""
+    languages: ["java"]
+    taint_sink: false
+
+  - id: "QSC-113"
+    severity: "CRITICAL"
+    title: "Uso de System.Random (C#/.NET) para segurança"
+    description: >
+      System.Random é um gerador pseudoaleatório não criptográfico.
+      Usá-lo para tokens, senhas ou chaves é perigoso.
+    recommendation: >
+      Use System.Security.Cryptography.RandomNumberGenerator ou
+      System.Security.Cryptography.RNGCryptoServiceProvider.
+    pattern: "new\\s+Random\\s*\\(|System\\.Random"
+    languages: ["csharp"]
+    taint_sink: false
+
+  - id: "QSC-114"
+    severity: "HIGH"
+    title: "Math.random() em JavaScript para segurança"
+    description: >
+      Math.random() não é criptograficamente seguro. Não deve ser usado
+      para gerar tokens, senhas ou qualquer material sensível.
+    recommendation: >
+      Use window.crypto.getRandomValues() ou uma biblioteca adequada
+      (ex.: crypto-js, libsodium).
+    pattern: "Math\\.random\\s*\\(\\s*\\)"
+    languages: ["javascript", "typescript"]
+    taint_sink: false
+
+
+  - id: "QSC-116"
+    severity: "CRITICAL"
+    title: "Chave privada RSA embutida em código (PEM/DER)"
+    description: >
+      Blocos de chave privada (-----BEGIN PRIVATE KEY-----) ou
+      strings base64 muito longas podem representar material
+      criptográfico comprometido.
+    recommendation: >
+      Remova imediatamente do repositório e rotacione a chave.
+      Use um cofre de segredos para armazenar chaves privadas.
+    pattern: "-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----"
+    languages: []
+    taint_sink: false
