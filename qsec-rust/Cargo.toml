@@ -14,7 +14,7 @@ name = "omniuil-ai"
 path = "src/main.rs"
 
 [lib]
-name = "omniuil-ai"
+name = "qsec"
 path = "src/lib.rs"
 
 # ─── Dependências Principais ──────────────────────────────────────────────────

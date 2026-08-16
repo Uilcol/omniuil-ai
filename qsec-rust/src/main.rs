@@ -106,6 +106,10 @@ struct ScanArgs {
     /// Ignora severidades abaixo deste nível na saída
     #[arg(long, value_enum)]
     min_severity: Option<MinSeverity>,
+    /// Padrões adicionais a excluir do scan (glob), separados por vírgula.
+    /// Ex: --exclude "**/mock/**,**/*.generated.go"
+    #[arg(long, value_delimiter = ',')]
+    exclude: Vec<String>,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -341,6 +345,12 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
     let mut platform = QsecPlatform::new()?;
 
     // Usa scan com config — respeita ignore_paths, disabled_rules, custom_patterns
+    let mut config = config.clone();
+    if !args.exclude.is_empty() {
+        config.scanner.ignore_paths.extend(args.exclude.iter().cloned());
+        eprintln!("[QSEC] {} padrão(ões) de exclusão customizado(s) aplicado(s)", args.exclude.len());
+    }
+    let config = &config;
     platform.scanner.clear();
     if args.path.is_file() {
         platform.scanner.scan_file_with_config(&args.path, Some(config))?;

@@ -140,7 +140,11 @@ pub struct CustomPattern {
 fn default_fail_on()      -> Vec<String> { vec!["CRITICAL".into(), "HIGH".into()] }
 fn default_ignore_paths() -> Vec<String> {
     vec!["vendor/".into(), "target/".into(), "node_modules/".into(),
-         ".git/".into(), "generated/".into(), "*.min.js".into()]
+         ".git/".into(), "generated/".into(), "*.min.js".into(),
+         "test/".into(), "tests/".into(), "*Test.java".into(),
+         "*_test.go".into(), "*.test.ts".into(), "*.test.js".into(),
+         "spec/".into(), "__tests__/".into(), "example/".into(),
+         "examples/".into()]
 }
 fn default_extensions()   -> Vec<String> {
     vec!["rs".into(), "py".into(), "go".into(), "java".into(),
@@ -431,13 +435,20 @@ impl QsecConfig {
     pub fn should_ignore(&self, path: &str) -> bool {
         let path_lower = path.to_lowercase();
         self.scanner.ignore_paths.iter().any(|pattern| {
+            let pattern_lower = pattern.to_lowercase();
             if pattern.ends_with('/') {
-                path_lower.contains(&pattern.to_lowercase())
+                // Diretório: "test/" casa qualquer path contendo "/test/" ou iniciando com "test/"
+                path_lower.contains(&pattern_lower)
             } else if pattern.starts_with("*.") {
-                let ext = &pattern[1..];
+                // Extensão: "*.min.js" casa qualquer path terminado em ".min.js"
+                let ext = &pattern_lower[1..];
                 path_lower.ends_with(ext)
+            } else if let Some(suffix) = pattern.strip_prefix('*') {
+                // Sufixo genérico: "*Test.java" casa "FooTest.java", "*_test.go" casa "bar_test.go"
+                path_lower.ends_with(&suffix.to_lowercase())
             } else {
-                path_lower.contains(&pattern.to_lowercase())
+                // Substring simples (fallback)
+                path_lower.contains(&pattern_lower)
             }
         })
     }
