@@ -337,3 +337,19 @@ MIT License — veja [LICENSE](LICENSE)
 
 Projeto desenvolvido no Brasil 🇧🇷  
 Repositório: [github.com/Uilcol/omniuil-ai](https://github.com/Uilcol/omniuil-ai)
+
+## Licenciamento
+
+O OmniUil AI segue um modelo **open-core**:
+
+| Componente | Licença | Uso |
+|---|---|---|
+| **Engine de scanning** (`qsec-rust`) | Apache 2.0 | Livre para qualquer uso, incluindo produção comercial, sem restrições. |
+| **Dashboard + API + Agentes IA** (`qsec-enterprise`, `qsec-agents`) | Comercial | Gratuito para avaliação (90 dias) e empresas pequenas (< 10 funcionários). Uso em produção por empresas maiores requer licença comercial. |
+
+### Solicitar licença comercial ou demonstração
+
+📋 **[Preencher formulário de contato →](https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform?usp=header)**
+
+Respondemos em até 1 dia útil com proposta de licenciamento ou agenda de demonstração técnica.
+
