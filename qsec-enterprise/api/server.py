@@ -6,7 +6,7 @@ from functools import wraps
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "qsec-agents"))
 from flask import Flask, request, jsonify, Response, send_from_directory, stream_with_context
-from licensing import check_access, declare_company_size, install_license_key
+from licensing import check_access, declare_company_size, install_license_key, get_tier, get_tier_limits, check_repo_limit, TIER_LIMITS
 
 _RAW_SECRET = os.environ.get("QSEC_API_SECRET", "dev-secret-change-in-production")
 _DEFAULT_SECRET = "dev-secret-change-in-production"
@@ -42,7 +42,12 @@ def _db_init():
     con.execute("PRAGMA journal_mode=WAL")   # safe concurrent writes
     con.execute("PRAGMA foreign_keys=ON")
     con.executescript("""
-        CREATE TABLE IF NOT EXISTS findings (
+        CREATE TABLE IF NOT EXISTS repos_tracked (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo_path TEXT UNIQUE NOT NULL,
+        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS findings (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id    TEXT,
             severity  TEXT,
@@ -475,6 +480,32 @@ def auth_token():
 @require_auth()
 def engine_info(): return jsonify(_run_qsec("info"))
 
+
+@app.route("/api/"+API_VERSION+"/license/usage")
+def license_usage():
+    """Retorna uso atual vs limites do plano."""
+    with _state_lock:
+        try:
+            con = sqlite3.connect(_DB_PATH)
+            cur = con.cursor()
+            cur.execute("SELECT COUNT(*) FROM repos_tracked")
+            repo_count = cur.fetchone()[0]
+            con.close()
+        except Exception:
+            repo_count = 0
+    tier = get_tier()
+    limits = get_tier_limits()
+    return jsonify({
+        "tier": tier,
+        "limits": limits,
+        "usage": {
+            "repos": repo_count,
+            "scans_total": _metrics.get("scans_total", 0),
+            "findings_total": _metrics.get("findings_total", 0),
+        },
+        "upgrade_url": "https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform",
+    })
+
 @app.route("/api/"+API_VERSION+"/license/status")
 def license_status():
     return jsonify(check_access())
@@ -507,6 +538,38 @@ def scan_start():
     with _state_lock:
         _jobs[jid] = job
     _db_save_job(job, "jobs")
+    # Verifica limite de repositórios do tier
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        cur = con.cursor()
+        cur.execute("INSERT OR IGNORE INTO repos_tracked (repo_path) VALUES (?)", (safe,))
+        con.commit()
+        cur.execute("SELECT COUNT(*) FROM repos_tracked")
+        repo_count = cur.fetchone()[0]
+        con.close()
+        ok, msg = check_repo_limit(repo_count)
+        if not ok:
+            with _state_lock:
+                del _jobs[jid]
+            return jsonify({"error": msg, "upgrade_url": "https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform"}), 403
+    except Exception as e:
+        pass  # Não bloqueia scan se verificação falhar
+    # Verifica limite de repositórios do tier
+    try:
+        con = sqlite3.connect(_DB_PATH)
+        cur = con.cursor()
+        cur.execute('INSERT OR IGNORE INTO repos_tracked (repo_path) VALUES (?)', (safe,))
+        con.commit()
+        cur.execute('SELECT COUNT(*) FROM repos_tracked')
+        repo_count = cur.fetchone()[0]
+        con.close()
+        ok, msg = check_repo_limit(repo_count)
+        if not ok:
+            with _state_lock:
+                _jobs.pop(jid, None)
+            return jsonify({'error': msg, 'upgrade_url': 'https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform'}), 403
+    except Exception:
+        pass  # Não bloqueia scan se verificação falhar
     threading.Thread(target=_run_scan_job, args=(jid,safe), daemon=True).start()
     return jsonify({"job_id":jid,"status":"queued","poll_url":"/api/"+API_VERSION+"/scan/"+jid}), 202
 

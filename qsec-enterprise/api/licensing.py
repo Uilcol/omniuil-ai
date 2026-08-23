@@ -189,7 +189,7 @@ def generate_keypair():
     print(pub_pem)
 
 
-def issue_license_key(company: str, months: int, private_key_pem: str) -> str:
+def issue_license_key(company: str, months: int, private_key_pem: str, tier: str = "starter") -> str:
     """
     Emite uma nova chave de licença para um cliente que pagou.
     Rode isso na SUA máquina (nunca no servidor do cliente), usando a
@@ -208,6 +208,7 @@ def issue_license_key(company: str, months: int, private_key_pem: str) -> str:
     exp = datetime.now(timezone.utc) + timedelta(days=30 * months)
     payload = {
         "company": company,
+        "tier": tier,
         "issued_at": datetime.now(timezone.utc).isoformat(),
         "exp": exp.timestamp(),
     }
@@ -262,3 +263,66 @@ def issue_license_key(company: str, months: int, private_key_pem: str) -> str:
 #      "
 #
 #    Envie a chave gerada por e-mail para o cliente colar no dashboard dele.
+
+
+# ── Tiers disponíveis ─────────────────────────────────────────────────────
+TIER_LIMITS = {
+    "starter": {
+        "repos": 5,
+        "agents": ["scanner", "analysis"],
+        "users": 1,
+        "api_rate_limit": 30,
+        "auto_remediate": False,
+        "integrations": False,
+        "compliance_report": False,
+    },
+    "pro": {
+        "repos": None,  # ilimitado
+        "agents": ["scanner", "analysis", "remediation", "monitoring", "incident"],
+        "users": 5,
+        "api_rate_limit": 300,
+        "auto_remediate": True,
+        "integrations": True,
+        "compliance_report": True,
+    },
+    "enterprise": {
+        "repos": None,
+        "agents": ["scanner", "analysis", "remediation", "monitoring", "incident"],
+        "users": None,
+        "api_rate_limit": None,
+        "auto_remediate": True,
+        "integrations": True,
+        "compliance_report": True,
+    },
+}
+
+def get_tier() -> str:
+    """Retorna o tier atual da licença instalada."""
+    state = _load_state()
+    key = state.get("license_key")
+    if not key:
+        return "free"
+    try:
+        payload = jwt.decode(key, OMNIUIL_PUBLIC_KEY, algorithms=["EdDSA"])
+        return payload.get("tier", "starter")
+    except JWTError:
+        return "free"
+
+def get_tier_limits() -> dict:
+    """Retorna os limites do tier atual."""
+    tier = get_tier()
+    if tier == "free":
+        return {"repos": 0, "agents": [], "users": 0, "api_rate_limit": 0,
+                "auto_remediate": False, "integrations": False, "compliance_report": False}
+    return TIER_LIMITS.get(tier, TIER_LIMITS["starter"])
+
+def check_repo_limit(current_repos: int) -> tuple[bool, str]:
+    """Verifica se pode adicionar mais um repositório."""
+    limits = get_tier_limits()
+    max_repos = limits.get("repos")
+    if max_repos is None:
+        return True, "ok"
+    if current_repos >= max_repos:
+        tier = get_tier()
+        return False, f"Limite de {max_repos} repositório(s) atingido no plano {tier.upper()}. Faça upgrade para Pro."
+    return True, "ok"

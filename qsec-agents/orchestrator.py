@@ -85,11 +85,33 @@ class QsecOrchestrator:
         self.bus        = AgentBus()
 
         # Instancia todos os agentes
+        # Controle de agentes por tier de licença
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'qsec-enterprise', 'api'))
+        try:
+            from licensing import get_tier, get_tier_limits
+            tier = get_tier()
+            limits = get_tier_limits()
+            allowed_agents = limits.get("agents", [])
+        except Exception:
+            tier = "free"
+            allowed_agents = []
+
+        # Sempre instancia Scanner e Analysis (mínimo para qualquer plano pago)
         self.scanner    = ScannerAgent(self.memory)
         self.analyst    = AnalysisAgent(self.memory)
-        self.remediator = RemediationAgent(self.memory)
-        self.monitor    = MonitoringAgent(self.memory)
-        self.incident   = IncidentAgent(self.memory)
+
+        # Agentes avançados: só Pro e Enterprise
+        self.remediator = RemediationAgent(self.memory) if "remediation" in allowed_agents else None
+        self.monitor    = MonitoringAgent(self.memory)  if "monitoring"  in allowed_agents else None
+        self.incident   = IncidentAgent(self.memory)    if "incident"    in allowed_agents else None
+
+        if tier == "free":
+            import logging
+            logging.getLogger("orchestrator").warning(
+                "Plano FREE — agentes de IA desabilitados. Upgrade em: "
+                "https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform"
+            )
 
         self._monitoring_task: asyncio.Task | None = None
         self._setup_bus_subscriptions()
