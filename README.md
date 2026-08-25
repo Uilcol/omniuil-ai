@@ -1,17 +1,19 @@
-# OmniUil AI — Post-Quantum Cryptographic Firewall
+# OmniUil AI — Post-Quantum Cryptographic Security Platform
 
 <div align="center">
 
-![OmniUil AI](https://img.shields.io/badge/OmniUil AI-v3.3.0-0A2540?style=for-the-badge&logo=shield&logoColor=3B82F6)
+![OmniUil AI](https://img.shields.io/badge/OmniUil_AI-v3.3.0-00d4ff?style=for-the-badge&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Online-00e676?style=for-the-badge)
 ![Rust](https://img.shields.io/badge/Rust-1.75+-CE422B?style=for-the-badge&logo=rust&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge)
-![NIST](https://img.shields.io/badge/NIST-FIPS%20203%2F204-1D4ED8?style=for-the-badge)
+![NIST](https://img.shields.io/badge/NIST-FIPS_203%2F204-1a3a5c?style=for-the-badge)
 
-**O único firewall criptográfico com IA local que detecta, analisa e corrige vulnerabilidades quânticas no seu código — sem enviar nada para fora da sua máquina.**
+**O único scanner de segurança criptográfica pós-quântica com taint analysis,
+IA local e dashboard empresarial — 100% na sua infraestrutura, sem enviar
+código para fora da sua máquina.**
 
-[🚀 Instalação](#instalação-em-1-comando) • [🎯 Como Funciona](#como-funciona) • [📊 Demo](#demo) • [🔬 Arquitetura](#arquitetura)
+[🚀 Instalação](#instalação) • [🎯 O que detecta](#o-que-detecta) • [📊 Casos de uso reais](#casos-de-uso-reais) • [💼 Planos](#planos)
 
 </div>
 
@@ -19,204 +21,189 @@
 
 ## O Problema
 
-Em 2030, computadores quânticos serão capazes de quebrar **RSA**, **ECDSA** e **ECDH** — os algoritmos que protegem 99% das comunicações da internet hoje.
+Em 2030, computadores quânticos serão capazes de quebrar **RSA**, **ECDSA**
+e **Diffie-Hellman** — os algoritmos que protegem 99% das comunicações da
+internet hoje.
 
-Dados criptografados **agora** podem ser capturados e decifrados **depois** — o ataque _"Harvest Now, Decrypt Later"_ (HNDL) já está acontecendo.
-
-O NIST publicou os primeiros padrões PQC em 2024. A conformidade com **CNSA 2.0** torna-se obrigatória em **2027**.
-
-```
-Você tem:  RSA-2048        →  ❌ Quebrável pelo algoritmo de Shor
-Você quer: ML-KEM-1024     →  ✅ Seguro contra ameaças quânticas (NIST FIPS 203)
-           ML-DSA-87       →  ✅ Assinaturas pós-quânticas (NIST FIPS 204)
-```
+O ataque _"Harvest Now, Decrypt Later"_ (HNDL) já está acontecendo: dados
+criptografados hoje podem ser capturados e decifrados quando o hardware quântico
+estiver disponível. O NIST publicou os primeiros padrões PQC em 2024 (FIPS 203/204).
+A conformidade com **CNSA 2.0** torna-se obrigatória em **2027**.
 
 ---
 
-## O que o OmniUil AI faz
+## O que detecta
 
-```
-$ omniuil-ai scan ./meu-projeto --format text
+### 14 regras PQC builtin
 
-[OmniUil AI v3.3.0] Backend: reference
-╔══════════════════════════════════════════════════════════════╗
-║         OmniUil AI — Relatório de Análise Criptográfica  v3.3      ║
-╚══════════════════════════════════════════════════════════════╝
-  Scanner findings  : 7
-  Taint findings    : 4
-  CRITICAL          : 3
-  HIGH              : 4
-
-── CRITICAL ──────────────────────────────────────────────────
-  [QSC-001] RSA detectado
-  📍 src/auth.py:19
-  📝 RSA é vulnerável ao algoritmo de Shor.
-  ✅ Migre para ML-DSA (assinaturas) ou ML-KEM (troca de chaves).
-  🔍 chave_rsa = RSA.generate(2048)
-
-── TAINT ANALYSIS ────────────────────────────────────────────
-  [TAINT-001] Fluxo de taint: requisição HTTP → sink criptográfico
-  🔀 'algoritmo' (HTTP request) linha 26 → jwt.encode() linha 27
-  📝 Atacante pode injetar algorithm="none" e desabilitar verificação JWT.
-```
-
----
-
-## Funcionalidades
-
-### Scanner PQC (14 regras)
 | Regra | Severidade | Detecta |
 |-------|-----------|---------|
-| QSC-001 | CRITICAL | RSA — vulnerável ao algoritmo de Shor |
+| QSC-001 | CRITICAL | RSA em qualquer forma |
 | QSC-002 | CRITICAL | ECDSA / ECDH / curvas elípticas |
 | QSC-003 | CRITICAL | Diffie-Hellman clássico |
-| QSC-010 | HIGH | MD5 — criptograficamente quebrado |
-| QSC-011 | HIGH | SHA-1 — oficialmente quebrado (2017) |
-| QSC-012 | HIGH | AES-ECB — semanticamente inseguro |
-| QSC-013 | HIGH | DES / 3DES — depreciado NIST 2023 |
-| QSC-014 | CRITICAL | RC4 — proibido no TLS (RFC 7465) |
-| QSC-020 | CRITICAL | JWT algoritmo "none" |
-| QSC-021 | MEDIUM | JWT HMAC simétrico (HS256/384/512) |
+| QSC-010 | HIGH | MD5 |
+| QSC-011 | HIGH | SHA-1 |
+| QSC-012 | HIGH | AES modo ECB |
+| QSC-013 | HIGH | DES / 3DES |
+| QSC-014 | CRITICAL | RC4 |
+| QSC-020 | CRITICAL | JWT algorithm "none" |
+| QSC-021 | MEDIUM | JWT HMAC simétrico |
 | QSC-022 | CRITICAL | JWT assinado com RSA |
 | QSC-030 | HIGH | Segredos hardcoded |
 | QSC-031 | HIGH | Semente aleatória previsível |
-| QSC-040 | HIGH | Memória com chaves não zeroizada |
+| QSC-116 | CRITICAL | Chave privada PEM embutida no código |
 
-### Language Adapters
-Regras específicas por linguagem para APIs nativas:
+### Language Adapters (APIs nativas por linguagem)
 
 | Linguagem | APIs detectadas |
 |-----------|----------------|
-| Python | PyCryptodome, cryptography, hashlib, passlib, Flask-JWT |
+| Python | PyCryptodome, hashlib, passlib, Flask-JWT |
 | Java | JCE, Bouncy Castle, Spring Security, JSSE |
 | C# | System.Security.Cryptography, BouncyCastle .NET |
 | Go | crypto/rsa, crypto/ecdsa, crypto/md5, x/crypto |
-| JavaScript/TypeScript | Node.js crypto, jsonwebtoken, CryptoJS, node-forge |
+| JavaScript/TypeScript | Node.js crypto, jsonwebtoken, CryptoJS |
 
 ### Taint Analysis
-Rastreia fluxo de dados externos até operações criptográficas:
+
+Rastreia dados externos (HTTP requests, variáveis de ambiente) até operações
+criptográficas — detecta ataques de injeção de parâmetros como Algorithm
+Injection em JWT:
 
 ```python
-# OmniUil AI detecta este fluxo automaticamente:
-algoritmo = request.json.get("alg")        # ← fonte: HTTP request
+# DETECTADO AUTOMATICAMENTE:
+algoritmo = request.json.get("alg")           # ← fonte: HTTP
 token = jwt.encode(data, key, algorithm=algoritmo)  # ← sink: JWT
-# ALERTA: atacante pode enviar {"alg": "none"} e bypassar verificação
+# ALERTA: atacante envia {"alg":"none"} → bypass total de autenticação
 ```
 
-### Regras YAML Customizáveis
-Adicione regras sem recompilar:
+### Regras YAML customizáveis
+
+Adicione regras específicas da sua organização sem recompilar:
 
 ```yaml
-# .omniuil-ai/rules/minhas-regras.yaml
 rules:
   - id: "CUSTOM-001"
     severity: "CRITICAL"
     title: "API legada insegura"
-    pattern: "api_v1_insecure\\("
-    languages: ["python"]
+    pattern: "api_v1_legacy\\("
+    languages: ["python", "java"]
 ```
-
-### Grafo de Evidências
-Contexto visual de código ao redor de cada finding:
-
-```
-┌─ QSC-001 (CRITICAL) ─ RSA detectado ──────────────────────┐
-│ 📄 src/auth.py
-│   17 │ def gerar_chave():
-│   18 │     tamanho = config.get("key_size")
-│►  19 │     chave = RSA.generate(tamanho)  ← VULNERÁVEL
-│   20 │     return chave
-└────────────────────────────────────────────────────────────┘
-```
-
-### PQC Engine (NIST FIPS 203/204)
-```
-KEM:  X25519 + ML-KEM-1024  (Proteção HNDL)
-DSA:  Ed25519 + ML-DSA-87   (Assinaturas híbridas)
-Sym:  AES-256-GCM            (Criptografia simétrica)
-KDF:  HKDF-SHA3-256          (Derivação de chaves)
-JWT:  PQC-JWT                (Tokens pós-quânticos)
-```
-
-### 5 Agentes IA (Ollama local — sem API key)
-- **ScannerAgent** — escaneia projetos autonomamente
-- **AnalysisAgent** — calcula Quantum Risk Score (0-100)
-- **RemediationAgent** — sugere correções específicas
-- **MonitoringAgent** — monitora regressões em tempo real
-- **IncidentAgent** — responde a alertas críticos
 
 ---
 
-## Instalação em 1 Comando
+## Casos de Uso Reais
 
-### Linux / macOS / WSL2
+### OWASP WebGoat
+```
+Scanner findings  : 51
+CRITICAL          : 13
+HIGH              : 38
+```
+Incluindo: JWT `alg:none`, RSA-2048, MD5 em senhas, segredos hardcoded.
+
+### Keycloak (projeto enterprise real)
+```
+Scanner findings  : 443
+CRITICAL          : 382
+HIGH              : 50
+```
+RSA como provider padrão em `DefaultKeyProviders` — mapeamento completo
+para plano de migração PQC.
+
+### Spring Security
+```
+Scanner findings  : 437
+CRITICAL          : 393
+HIGH              : 44
+```
+
+> Detalhes completos em [CASE_STUDY.md](./CASE_STUDY.md)
+
+---
+
+## Instalação
+
+### Pré-requisitos
+
+- Docker Desktop
+- Rust / Cargo (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Linux, macOS ou WSL2
+
+### 1 comando
+
 ```bash
 git clone https://github.com/Uilcol/omniuil-ai.git
-cd omniuil-ai/omniuil-ai-enterprise
+cd omniuil-ai/qsec-enterprise
 bash install.sh
 ```
 
-### Windows (PowerShell Admin)
-```powershell
-git clone https://github.com/Uilcol/omniuil-ai.git
-cd omniuil-ai\omniuil-ai-enterprise
-.\install.ps1
-```
+Dashboard disponível em `http://localhost:8080`
 
-**Resultado:** Dashboard em `http://localhost:8080`  
-**Credenciais:** Salvas em `~/.omniuil-ai/ACESSO.txt`
-
-### Pré-requisitos
-- Docker Desktop
-- Rust / Cargo (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-- ~4 GB de espaço (modelo de IA incluído)
-
----
-
-## CLI
+### CLI (engine independente)
 
 ```bash
-# Compilar o engine
-cd omniuil-ai-rust && cargo build --release
+cd omniuil-ai/qsec-rust
+cargo build --release
 
-# Escanear um projeto
-./target/release/omniuil-ai scan ./meu-projeto --format text
+# Escanear projeto
+./target/release/qsec scan ./meu-projeto --format text
 
-# Saída JSON (para CI/CD)
-./target/release/omniuil-ai scan ./meu-projeto --format json
+# Excluir diretórios específicos
+./target/release/qsec scan ./meu-projeto --exclude "**/mock/**,**/generated/**"
 
-# Saída SARIF (GitHub Code Scanning)
-./target/release/omniuil-ai scan ./meu-projeto --format sarif
+# Saída JSON para CI/CD
+./target/release/qsec scan ./meu-projeto --format json
 
-# Gerar SBOM CycloneDX 1.5
-./target/release/omniuil-ai sbom ./meu-projeto
-
-# Assinar artefato com PQC híbrido
-./target/release/omniuil-ai sign ./release.tar.gz
-
-# Emitir PQC-JWT
-./target/release/omniuil-ai token issue --subject user@empresa.com --ttl 3600
+# SARIF para GitHub Code Scanning
+./target/release/qsec scan ./meu-projeto --format sarif
 ```
 
 ---
 
-## API REST
+## Formatos de Saída
+
+| Formato | Comando | Uso |
+|---------|---------|-----|
+| Texto | `--format text` | Terminal, leitura humana |
+| JSON | `--format json` | Integração, CI/CD, automação |
+| SARIF 2.1.0 | `--format sarif` | GitHub Security tab, Azure DevOps |
+
+---
+
+## API REST (22 endpoints)
 
 ```bash
 # Autenticar
-curl -X POST http://localhost:8080/api/v1/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"client_id": "meu-app", "client_secret": "SUA_SENHA"}'
+POST /api/v1/auth/token
 
-# Escanear projeto
-curl -X POST http://localhost:8080/api/v1/scan \
-  -H "Authorization: Bearer SEU_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/caminho/do/projeto"}'
+# Scan assíncrono
+POST /api/v1/scan
+GET  /api/v1/scan/{job_id}
 
-# Verificar resultado
-curl http://localhost:8080/api/v1/scan/JOB_ID \
-  -H "Authorization: Bearer SEU_TOKEN"
+# Auditoria completa com agentes IA
+POST /api/v1/audit
+GET  /api/v1/audit/{job_id}
+
+# Licença
+GET  /api/v1/license/status
+GET  /api/v1/license/usage
+POST /api/v1/license/activate
+
+# SBOM CycloneDX 1.5
+POST /api/v1/sbom
+
+# PQC-JWT
+POST /api/v1/jwt/issue
+POST /api/v1/jwt/verify
+POST /api/v1/jwt/revoke
+
+# Chaves
+GET  /api/v1/keys/status
+POST /api/v1/keys/rotate
+
+# Dashboard
+GET  /api/v1/dashboard
+GET  /api/v1/health
 ```
 
 ---
@@ -224,71 +211,101 @@ curl http://localhost:8080/api/v1/scan/JOB_ID \
 ## Integração CI/CD
 
 ### GitHub Actions
+
 ```yaml
 - name: OmniUil AI Security Scan
-  uses: Uilcol/omniuil-ai@v3.3.0
+  run: |
+    ./target/release/qsec scan ./src --format sarif > results.sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
   with:
-    path: ./src
-    fail-on: CRITICAL,HIGH
-    format: sarif
+    sarif_file: results.sarif
 ```
 
-### Docker
-```bash
-# Iniciar
-cd ~/.omniuil-ai && docker compose up -d
+---
 
-# Parar
-docker compose down
+## Agentes IA (Ollama local — sem API key)
 
-# Logs
-docker compose logs -f
+5 agentes autônomos que rodam 100% na sua infraestrutura:
 
-# Atualizar
-docker compose pull && docker compose up -d
-```
+| Agente | Função |
+|--------|--------|
+| ScannerAgent | Escaneia projetos autonomamente |
+| AnalysisAgent | Calcula Quantum Risk Score (0-100) |
+| RemediationAgent | Sugere correções específicas por vulnerabilidade |
+| MonitoringAgent | Monitora regressões em tempo real |
+| IncidentAgent | Responde alertas críticos automaticamente |
+
+Os agentes disponíveis variam conforme o plano contratado.
+
+---
+
+## Planos
+
+| | **Free** | **Starter** | **Pro** | **Enterprise** |
+|---|---|---|---|---|
+| Engine CLI (`qsec-rust`) | ✅ Ilimitado | ✅ Ilimitado | ✅ Ilimitado | ✅ Ilimitado |
+| 14 regras PQC + YAML custom | ✅ | ✅ | ✅ | ✅ |
+| Taint analysis | ✅ | ✅ | ✅ | ✅ |
+| SBOM, PQC-JWT, SARIF | ✅ | ✅ | ✅ | ✅ |
+| Dashboard web | ❌ | ✅ | ✅ | ✅ |
+| Repositórios monitorados | — | Até 5 | Ilimitado | Ilimitado |
+| API REST | ❌ | ✅ | ✅ | ✅ |
+| Agentes IA ativos | ❌ | Scanner + Analysis | Todos os 5 | Todos os 5 |
+| Auto-remediate via LLM | ❌ | ❌ | ✅ | ✅ |
+| Usuários no dashboard | — | 1 | Até 5 | Ilimitado |
+| Integrações (Slack, Jira) | ❌ | ❌ | ✅ | ✅ |
+| Relatório de conformidade CNSA 2.0 | ❌ | ❌ | ✅ | ✅ |
+| Suporte | Comunidade | E-mail | E-mail prioritário | Canal dedicado + SLA |
+| Deploy | Self-hosted | Self-hosted | Self-hosted | Self-hosted assistido |
+
+### Solicitar licença ou demonstração
+
+📋 **[Preencher formulário de contato →](https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform?usp=header)**
+
+Respondemos em até 1 dia útil com proposta ou agenda de demonstração técnica.
 
 ---
 
 ## Arquitetura
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   OmniUil AI v3.3.0                       │
-├──────────────┬──────────────┬───────────────────────┤
-│  omniuil-ai-rust   │  omniuil-ai-agents │  omniuil-ai-enterprise      │
-│  (Engine)    │  (IA Local)  │  (API + Dashboard)    │
-├──────────────┼──────────────┼───────────────────────┤
-│ Scanner PQC  │ ScannerAgent │ API REST (22 endpoints)│
-│ Taint Engine │ AnalysisAgent│ Dashboard Web          │
-│ Lang Adapters│ RemediationAg│ Auth HMAC-SHA3         │
-│ YAML Rules   │ MonitoringAg │ SQLite Persistence     │
-│ Evidence Graph│ IncidentAgent│ Rate Limiting          │
-│ PQC Engine   │ Orchestrator │ Docker 3-stage         │
-│ SBOM CycloneDX│ AgentBus    │ GitHub Actions CI/CD   │
-│ PQC-JWT      │ SharedMemory │ Python SDK             │
-│ SARIF Export │ LLM Abstração│ SSE Streaming          │
-└──────────────┴──────────────┴───────────────────────┘
-        ↑                              ↑
-   #![forbid(unsafe_code)]      Ollama local
-   ML-KEM-1024 + ML-DSA-87     (sem API key)
-   AES-256-GCM + HKDF-SHA3     (dados ficam
-                                 na sua máquina)
+OmniUil AI
+├── qsec-rust/          Engine de análise (Rust, Apache 2.0)
+│   ├── 14 regras PQC builtin
+│   ├── Taint analysis (fonte → sink)
+│   ├── Language adapters (5 linguagens)
+│   ├── YAML Rule Engine
+│   ├── Evidence Graph
+│   └── SBOM / PQC-JWT / SARIF
+│
+├── qsec-agents/        Agentes IA (Python, Licença Comercial)
+│   ├── ScannerAgent
+│   ├── AnalysisAgent
+│   ├── RemediationAgent
+│   ├── MonitoringAgent
+│   └── IncidentAgent (Ollama local)
+│
+└── qsec-enterprise/    API + Dashboard (Python, Licença Comercial)
+    ├── API REST 22 endpoints
+    ├── Dashboard Web
+    ├── Sistema de licenciamento (JWT Ed25519)
+    ├── Controle de tiers por chave
+    ├── SQLite + Docker
+    └── Rate limiting + Audit log imutável
 ```
 
 ---
 
-## Por que OmniUil AI?
+## Licenciamento
 
-| | OmniUil AI | Semgrep | Snyk | SandboxAQ |
-|---|---|---|---|---|
-| Detecção PQC | ✅ | ❌ | ❌ | ✅ |
-| Taint Analysis Crypto | ✅ | Parcial | ❌ | ❌ |
-| IA local (sem API key) | ✅ | ❌ | ❌ | ❌ |
-| SBOM CycloneDX 1.5 | ✅ | ❌ | ✅ | ❌ |
-| PQC-JWT nativo | ✅ | ❌ | ❌ | ❌ |
-| 1-comando install | ✅ | ✅ | ✅ | ❌ |
-| Preço | Acessível | Freemium | Pago | Enterprise |
+| Componente | Licença |
+|---|---|
+| `qsec-rust` (engine/CLI) | Apache 2.0 — livre para qualquer uso |
+| `qsec-enterprise` + `qsec-agents` | Licença comercial — ver [qsec-enterprise/LICENSE](./qsec-enterprise/LICENSE) |
+
+Detalhes em [LICENSE_SUMMARY.md](./LICENSE_SUMMARY.md).
 
 ---
 
@@ -296,60 +313,15 @@ docker compose pull && docker compose up -d
 
 | Padrão | Status |
 |--------|--------|
-| NIST FIPS 203 (ML-KEM) | ✅ Implementado |
-| NIST FIPS 204 (ML-DSA) | ✅ Implementado |
+| NIST FIPS 203 (ML-KEM) | ✅ Implementado (modo referência) |
+| NIST FIPS 204 (ML-DSA) | ✅ Implementado (modo referência) |
 | CNSA 2.0 (obrigatório 2027) | ✅ Checklist completo |
-| LGPD / ANPD Brasil | ✅ Dados locais, sem cloud |
 | CycloneDX 1.5 (SBOM) | ✅ Implementado |
-| SLSA Level 2+ | ✅ Build attestation |
 | SARIF 2.1.0 | ✅ GitHub Code Scanning |
+| LGPD / ANPD Brasil | ✅ Dados locais, sem cloud |
 
 ---
 
-## Gestão do Stack
+## Desenvolvido no Brasil 🇧🇷 · 2026
 
-```bash
-# Iniciar o OmniUil AI
-cd ~/.omniuil-ai && docker compose up -d
-
-# Ver status
-docker compose ps
-
-# Ver senha de acesso
-cat ~/.omniuil-ai/ACESSO.txt
-
-# Acessar dashboard
-# http://localhost:8080
-
-# Parar
-docker compose down
-```
-
----
-
-## Licença
-
-MIT License — veja [LICENSE](LICENSE)
-
----
-
-## Contato
-
-Projeto desenvolvido no Brasil 🇧🇷  
-Repositório: [github.com/Uilcol/omniuil-ai](https://github.com/Uilcol/omniuil-ai)
-
-## Licenciamento
-
-O OmniUil AI segue um modelo **open-core**:
-
-| Componente | Licença | Uso |
-|---|---|---|
-| **Engine de scanning** (`qsec-rust`) | Apache 2.0 | Livre para qualquer uso, incluindo produção comercial, sem restrições. |
-| **Dashboard + API + Agentes IA** (`qsec-enterprise`, `qsec-agents`) | Comercial | Gratuito para avaliação (90 dias) e empresas pequenas (< 10 funcionários). Uso em produção por empresas maiores requer licença comercial. |
-
-### Solicitar licença comercial ou demonstração
-
-📋 **[Preencher formulário de contato →](https://docs.google.com/forms/d/e/1FAIpQLSfNMleQF2Ik-jHTT5HgPdsdkirXc4U_eJV3ON2hzI8ZR1TmQg/viewform?usp=header)**
-
-Respondemos em até 1 dia útil com proposta de licenciamento ou agenda de demonstração técnica.
-
+**Repositório:** [github.com/Uilcol/omniuil-ai](https://github.com/Uilcol/omniuil-ai)
