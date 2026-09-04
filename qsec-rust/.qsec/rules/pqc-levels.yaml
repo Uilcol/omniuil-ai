@@ -1,0 +1,72 @@
+rules:
+  - id: QSC-200
+    severity: HIGH
+    title: AES-128 abaixo do nivel PQC minimo recomendado
+    description: AES-128 oferece apenas 64 bits de seguranca contra ataques quanticos via Grover. NIST PQC Level 2 requer minimo AES-192 ou AES-256.
+    recommendation: Migre para AES-256-GCM ou ChaCha20-Poly1305.
+    pattern: 'AES_128|aes-128-|createCipheriv.*aes-128|AES\.new.*128'
+    languages: [python, javascript, go, java]
+    taint_sink: false
+
+  - id: QSC-201
+    severity: HIGH
+    title: SHA-256 insuficiente para assinaturas PQC Level 2
+    description: SHA-256 oferece apenas 128 bits de seguranca quantica. Para assinaturas digitais PQC Level 2, use SHA-384 ou SHA-512.
+    recommendation: Use SHA-384 ou SHA-512 em contextos de assinatura digital.
+    pattern: 'hashlib\.sha256\(\)|MessageDigest.*SHA-256|sha2\.New256\(\)|createHash.*sha256'
+    languages: [python, java, go, javascript]
+    taint_sink: false
+
+  - id: QSC-300
+    severity: MEDIUM
+    title: ECDH P-256 nao atinge PQC Level 3
+    description: P-256 e vulneravel ao algoritmo de Shor. Para PQC Level 3, use ML-KEM-768 ou hibrido X25519+ML-KEM-768.
+    recommendation: Substitua ECDH P-256 por ML-KEM-768 (NIST FIPS 203 Level 3).
+    pattern: 'P-256|secp256r1|prime256v1|NID_X9_62_prime256v1'
+    languages: [python, java, go, javascript, csharp]
+    taint_sink: false
+
+  - id: QSC-301
+    severity: MEDIUM
+    title: RSA-2048 nao atinge PQC Level 3
+    description: RSA-2048 e completamente vulneravel ao algoritmo de Shor. ML-KEM-768 equivale ao AES-192 contra ataques quanticos.
+    recommendation: Substitua RSA-2048 por ML-KEM-768 ou ML-DSA-65.
+    pattern: 'RSA\.generate\(2048|initialize\(2048|GenerateKey.*2048|RSA.*2048'
+    languages: [python, java, go, rust]
+    taint_sink: false
+
+  - id: QSC-400
+    severity: MEDIUM
+    title: ECDH P-384 nao atinge PQC Level 4
+    description: ECDH P-384 e vulneravel ao algoritmo de Shor. Para PQC Level 4, use ML-KEM-1024 ou hibrido X448+ML-KEM-1024.
+    recommendation: Substitua P-384 por ML-KEM-1024 (NIST FIPS 203 Level 5).
+    pattern: 'P-384|secp384r1|EC.*384'
+    languages: [python, java, go, javascript, csharp]
+    taint_sink: false
+
+  - id: QSC-500
+    severity: LOW
+    title: RSA-4096 nao atinge PQC Level 5
+    description: Mesmo RSA-4096 e vulneravel ao algoritmo de Shor. PQC Level 5 requer ML-KEM-1024 mais ML-DSA-87.
+    recommendation: Substitua RSA-4096 por ML-KEM-1024 mais ML-DSA-87 (NIST FIPS 203/204 Level 5).
+    pattern: 'RSA\.generate\(4096|initialize\(4096|GenerateKey.*4096'
+    languages: [python, java, go, rust]
+    taint_sink: false
+
+  - id: QSC-205
+    severity: LOW
+    title: Considere SLH-DSA como assinatura alternativa (NIST FIPS 205)
+    description: NIST FIPS 205 define SLH-DSA baseado em SPHINCS+. Recomendado como alternativa ao ML-DSA para diversidade de algoritmos em sistemas criticos de longa duracao.
+    recommendation: Implemente SLH-DSA (SPHINCS+-SHAKE-256s) como algoritmo de assinatura alternativo ao ML-DSA-87.
+    pattern: 'sphincs|slh.dsa|SphincsPlusSign|SPHINCS'
+    languages: []
+    taint_sink: false
+
+  - id: QSC-206
+    severity: LOW
+    title: Considere HQC como KEM alternativo ao ML-KEM
+    description: NIST selecionou HQC (Hamming Quasi-Cyclic) como KEM alternativo em 2025, baseado em error-correcting codes. Provê diversidade caso seja descoberta vulnerabilidade em lattice problems do ML-KEM.
+    recommendation: Para sistemas de alta criticidade, implemente HQC como KEM secundario ao ML-KEM-1024.
+    pattern: 'HQC128|HQC192|HQC256|hamming.quasi.cyclic'
+    languages: []
+    taint_sink: false
