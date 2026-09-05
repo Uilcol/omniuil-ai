@@ -1,0 +1,65 @@
+{
+  "name": "omniuil-ai",
+  "displayName": "OmniUil AI — Post-Quantum Security Scanner",
+  "description": "Detecta vulnerabilidades criptograficas pos-quanticas (RSA, ECDSA, MD5, JWT fraco). 33 regras PQC alinhadas ao NIST FIPS 203/204/205.",
+  "version": "1.0.0",
+  "publisher": "omniuil-ai",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Linters", "Other"],
+  "keywords": ["security", "post-quantum", "cryptography", "PQC", "SAST"],
+  "activationEvents": [
+    "onLanguage:python", "onLanguage:java", "onLanguage:go",
+    "onLanguage:javascript", "onLanguage:typescript",
+    "onLanguage:rust", "onLanguage:csharp", "onLanguage:ruby"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "omniuil.scanFile", "title": "OmniUil AI: Scan Current File", "icon": "$(shield)" },
+      { "command": "omniuil.scanWorkspace", "title": "OmniUil AI: Scan Workspace", "icon": "$(search)" },
+      { "command": "omniuil.scanFolder", "title": "OmniUil AI: Scan Folder...", "icon": "$(folder-opened)" },
+      { "command": "omniuil.showReport", "title": "OmniUil AI: Show Last Report", "icon": "$(graph)" },
+      { "command": "omniuil.configureBinary", "title": "OmniUil AI: Configure Binary Path", "icon": "$(settings-gear)" }
+    ],
+    "configuration": {
+      "title": "OmniUil AI",
+      "properties": {
+        "omniuil.binaryPath": {
+          "type": "string", "default": "",
+          "description": "Caminho para o binario omniuil-ai"
+        },
+        "omniuil.scanOnSave": { "type": "boolean", "default": true, "description": "Escanear ao salvar" },
+        "omniuil.scanOnOpen": { "type": "boolean", "default": false, "description": "Escanear ao abrir" },
+        "omniuil.minSeverity": {
+          "type": "string", "enum": ["critical","high","medium","low"],
+          "default": "medium", "description": "Severidade minima"
+        },
+        "omniuil.excludePatterns": {
+          "type": "array", "items": {"type":"string"},
+          "default": ["**/test/**","**/tests/**","**/node_modules/**"],
+          "description": "Padroes a excluir do scan"
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [{"command":"omniuil.scanFile","group":"navigation"}],
+      "explorer/context": [{"command":"omniuil.scanFolder","group":"security"}],
+      "editor/context": [{"command":"omniuil.scanFile","group":"security"}]
+    },
+    "views": {
+      "explorer": [{"id":"omniuilFindings","name":"OmniUil AI Findings","icon":"$(shield)"}]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}
