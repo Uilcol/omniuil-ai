@@ -350,3 +350,7 @@ rules:
     pattern: "-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----"
     languages: []
     taint_sink: false
+
+  # ── NIST PQC Level 1 — Algoritmos pré-quânticos críticos ─────────────────
+  # Já cobertos pelas regras QSC-001 a QSC-014
+  # Adicionando tag pqc_level para classificação granular

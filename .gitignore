@@ -30,3 +30,7 @@ qsec-backups/
 *.pem
 *private_key*
 MANUAL_LICENCA.md
+
+agents/gmail_token.json
+agents/gmail_credentials.json
+agents/agents.db
