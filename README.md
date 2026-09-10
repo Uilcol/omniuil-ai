@@ -298,6 +298,23 @@ OmniUil AI
 
 ---
 
+
+## OmniUil AI v5.0 — Tres Pilares Estrategicos
+
+### Pilar 1 — Quantum Posture Score
+Score determinístico 0-100. Responde em 60 segundos: qual e sua exposicao ao risco quantico?
+Calculado deterministicamente — auditavel perante conselho, auditores e reguladores (BACEN, ANPD, TCU).
+
+### Pilar 2 — Crypto Drift Detection
+Detecta regressoes criptograficas entre scans consecutivos.
+Dev faz merge de PR com RSA: alerta em 30 minutos. Score caiu: alerta para CISO.
+
+### Pilar 3 — Migration Intelligence
+Transforma 443 findings numa lista paralisante em plano acionavel.
+Priorizado por impacto de negocio. Estimativa de custo em BRL e deadline CNSA 2.0.
+
+Endpoints: POST /api/v1/v5/full-analysis | /v5/posture | /v5/drift | /v5/migration
+
 ## Licenciamento
 
 | Componente | Licença |
