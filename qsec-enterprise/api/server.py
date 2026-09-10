@@ -7,6 +7,9 @@ from functools import wraps
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "qsec-agents"))
 from flask import Flask, request, jsonify, Response, send_from_directory, stream_with_context
 from licensing import check_access, declare_company_size, install_license_key, get_tier, get_tier_limits, check_repo_limit, TIER_LIMITS
+from quantum_posture import calculate_quantum_posture
+from crypto_drift import detect_drift, get_drift_history, get_pending_alerts, init_drift_db
+from migration_intelligence import generate_migration_plan
 
 _RAW_SECRET = os.environ.get("QSEC_API_SECRET", "dev-secret-change-in-production")
 _DEFAULT_SECRET = "dev-secret-change-in-production"
@@ -846,6 +849,193 @@ def add_request_id(r):
 
 @app.errorhandler(413)
 def too_large(e): return jsonify({"error":"Request too large — max 1 MB"}), 413
+
+
+# ── OmniUil AI v5.0 — Três Pilares ───────────────────────────────────────────
+
+@app.route("/api/"+API_VERSION+"/v5/posture", methods=["POST"])
+def quantum_posture_endpoint():
+    """
+    Pilar 1: Quantum Posture Score
+    Calcula score 0-100 deterministicamente a partir de findings.
+    Input: {"findings": [...], "scan_path": "...", "files_scanned": N}
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    findings      = body.get("findings", [])
+    scan_path     = body.get("scan_path", "")
+    files_scanned = body.get("files_scanned", 0)
+    result = calculate_quantum_posture(findings, scan_path, files_scanned)
+    return jsonify({
+        "score":              result.score,
+        "risk_level":         result.risk_level,
+        "risk_color":         result.risk_color,
+        "total_findings":     result.total_findings,
+        "critical_findings":  result.critical_findings,
+        "high_findings":      result.high_findings,
+        "categories_affected":result.categories_affected,
+        "months_to_deadline": result.months_to_deadline,
+        "deadline_urgency":   result.deadline_urgency,
+        "top_risks":          result.top_risks,
+        "recommendation":     result.recommendation,
+        "detail":             result.detail,
+        "calculated_at":      result.calculated_at,
+    })
+
+@app.route("/api/"+API_VERSION+"/v5/drift", methods=["POST"])
+def crypto_drift_endpoint():
+    """
+    Pilar 2: Crypto Drift Detection
+    Compara scan atual com anterior e detecta regressões.
+    Input: {"findings": [...], "scan_path": "...", "posture_score": N}
+    """
+    body         = request.get_json(force=True, silent=True) or {}
+    findings     = body.get("findings", [])
+    scan_path    = body.get("scan_path", "")
+    score        = body.get("posture_score", 0)
+    init_drift_db()
+    report = detect_drift(scan_path, findings, score)
+    return jsonify({
+        "has_drift":         report.has_drift,
+        "scan_id":           report.scan_id,
+        "prev_scan_id":      report.prev_scan_id,
+        "score_before":      report.score_before,
+        "score_after":       report.score_after,
+        "score_delta":       report.score_delta,
+        "regression":        report.regression,
+        "improvement":       report.improvement,
+        "alert_level":       report.alert_level,
+        "summary":           report.summary,
+        "new_findings_count":     len(report.new_findings),
+        "resolved_findings_count":len(report.resolved_findings),
+        "new_findings":      report.new_findings[:10],
+        "scanned_at":        report.scanned_at,
+    })
+
+@app.route("/api/"+API_VERSION+"/v5/drift/history")
+def drift_history_endpoint():
+    """Histórico de scans para gráfico de evolução do Posture Score."""
+    scan_path = request.args.get("path", "")
+    limit     = min(int(request.args.get("limit", 10)), 50)
+    history   = get_drift_history(scan_path, limit)
+    return jsonify(history)
+
+@app.route("/api/"+API_VERSION+"/v5/drift/alerts")
+def drift_alerts_endpoint():
+    """Alertas de drift pendentes de notificação."""
+    alerts = get_pending_alerts()
+    return jsonify(alerts)
+
+@app.route("/api/"+API_VERSION+"/v5/migration", methods=["POST"])
+def migration_plan_endpoint():
+    """
+    Pilar 3: Migration Intelligence
+    Gera plano de migração priorizado por impacto de negócio.
+    Input: {"findings": [...], "scan_path": "...", "hourly_rate_brl": N}
+    """
+    body         = request.get_json(force=True, silent=True) or {}
+    findings     = body.get("findings", [])
+    scan_path    = body.get("scan_path", "")
+    hourly_rate  = body.get("hourly_rate_brl", 400)
+    plan = generate_migration_plan(findings, scan_path, hourly_rate)
+    return jsonify({
+        "scan_path":          plan.scan_path,
+        "total_steps":        plan.total_steps,
+        "immediate_steps":    plan.immediate_steps,
+        "short_term_steps":   plan.short_term_steps,
+        "medium_term_steps":  plan.medium_term_steps,
+        "long_term_steps":    plan.long_term_steps,
+        "total_effort_min":   plan.total_effort_min,
+        "total_effort_max":   plan.total_effort_max,
+        "total_cost_min":     plan.total_cost_min,
+        "total_cost_max":     plan.total_cost_max,
+        "months_to_deadline": plan.months_to_deadline,
+        "deadline_feasible":  plan.deadline_feasible,
+        "executive_summary":  plan.executive_summary,
+        "steps": [
+            {
+                "step":            s.step_number,
+                "priority":        s.priority,
+                "title":           s.title,
+                "category":        s.category,
+                "finding_count":   s.finding_count,
+                "affected_files":  s.affected_files,
+                "effort_min_h":    s.effort_hours_min,
+                "effort_max_h":    s.effort_hours_max,
+                "cost_brl_min":    s.cost_brl_min,
+                "cost_brl_max":    s.cost_brl_max,
+                "complexity":      s.complexity,
+                "recommendation":  s.recommendation,
+                "deadline_weeks":  s.deadline_weeks,
+                "deadline_date":   s.deadline_date,
+                "business_impact": s.business_impact,
+                "pqc_algorithm":   s.pqc_algorithm,
+            }
+            for s in plan.steps
+        ],
+        "generated_at": plan.generated_at,
+    })
+
+@app.route("/api/"+API_VERSION+"/v5/full-analysis", methods=["POST"])
+def full_analysis_endpoint():
+    """
+    Análise completa v5.0 — os 3 pilares em uma única chamada.
+    Input: {"findings": [...], "scan_path": "...", "files_scanned": N}
+    Output: Posture Score + Drift Report + Migration Plan
+    """
+    body         = request.get_json(force=True, silent=True) or {}
+    findings     = body.get("findings", [])
+    scan_path    = body.get("scan_path", "unknown")
+    files_scanned= body.get("files_scanned", 0)
+    hourly_rate  = body.get("hourly_rate_brl", 400)
+
+    # Pilar 1: Quantum Posture Score
+    posture = calculate_quantum_posture(findings, scan_path, files_scanned)
+
+    # Pilar 2: Crypto Drift
+    init_drift_db()
+    drift = detect_drift(scan_path, findings, posture.score)
+
+    # Pilar 3: Migration Intelligence
+    plan = generate_migration_plan(findings, scan_path, hourly_rate)
+
+    return jsonify({
+        "version": "5.0",
+        "scan_path": scan_path,
+        "quantum_posture": {
+            "score":          posture.score,
+            "risk_level":     posture.risk_level,
+            "risk_color":     posture.risk_color,
+            "recommendation": posture.recommendation,
+            "top_risks":      posture.top_risks,
+            "months_to_deadline": posture.months_to_deadline,
+        },
+        "crypto_drift": {
+            "has_drift":    drift.has_drift,
+            "alert_level":  drift.alert_level,
+            "summary":      drift.summary,
+            "score_delta":  drift.score_delta,
+            "regression":   drift.regression,
+            "new_findings_count": len(drift.new_findings),
+        },
+        "migration_intelligence": {
+            "executive_summary":  plan.executive_summary,
+            "total_steps":        plan.total_steps,
+            "immediate_steps":    plan.immediate_steps,
+            "total_cost_min":     plan.total_cost_min,
+            "total_cost_max":     plan.total_cost_max,
+            "deadline_feasible":  plan.deadline_feasible,
+            "first_3_steps": [
+                {
+                    "step":           s.step_number,
+                    "priority":       s.priority,
+                    "title":          s.title,
+                    "deadline_date":  s.deadline_date,
+                    "recommendation": s.recommendation[:150],
+                }
+                for s in plan.steps[:3]
+            ],
+        },
+    })
 
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT",8080))
