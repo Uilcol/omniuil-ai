@@ -348,6 +348,17 @@ impl CryptoScanner {
     }
 
     /// Escaneia com configuração enterprise.
+    
+    fn is_suppressed(line: &str, prev_line: Option<&str>) -> bool {
+        let patterns = [
+            "omniuil:ignore", "omniuil: ignore",
+            "qsec:ignore",    "qsec: ignore",
+            "nosec",
+        ];
+        let check = |l: &str| patterns.iter().any(|p| l.contains(p));
+        check(line) || prev_line.map_or(false, check)
+    }
+
     pub fn scan_file_with_config(
         &mut self,
         path: &Path,
@@ -401,6 +412,12 @@ impl CryptoScanner {
                         snippet_owned.as_str()
                     } else { snippet };
 
+                    // Verifica anotação de supressão omniuil:ignore
+                    let prev_line = if lineno > 0 { Some(lines[lineno - 1]) } else { None };
+                    if Self::is_suppressed(line, prev_line) {
+                        continue;
+                    }
+
                     findings.push(CryptoFinding {
                         file:           path.display().to_string(),
                         line:           lineno + 1,
@@ -443,8 +460,11 @@ impl CryptoScanner {
                         _          => Severity::Low,
                     };
 
+                    let prev_line = if lineno > 0 { Some(lines[lineno - 1]) } else { None };
+                    if Self::is_suppressed(line, prev_line) { continue; }
                     findings.push(CryptoFinding {
                         file:           path.display().to_string(),
+
                         line:           lineno + 1,
                         column:         lm.column,
                         severity,
@@ -473,7 +493,10 @@ impl CryptoScanner {
                     _          => Severity::Low,
                 };
 
+                let prev_line = if lineno > 0 { Some(lines[lineno - 1]) } else { None };
+                if Self::is_suppressed(line, prev_line) { continue; }
                 findings.push(CryptoFinding {
+
                     file:           path.display().to_string(),
                     line:           lineno + 1,
                     column:         ym.column,
@@ -499,6 +522,8 @@ impl CryptoScanner {
                             };
                             let snippet = line.trim();
                             let snippet = if snippet.len() > 120 { &snippet[..120] } else { snippet };
+                            let prev_line = if lineno > 0 { Some(lines[lineno - 1]) } else { None };
+                            if Self::is_suppressed(line, prev_line) { continue; }
                             findings.push(CryptoFinding {
                                 file:           path.display().to_string(),
                                 line:           lineno + 1,
@@ -646,6 +671,8 @@ impl CryptoScanner {
             };
 
             if let Some(&(rule_id, ref sev, desc, rec)) = VULN_CRATES.get(crate_name) {
+                let prev_line: Option<&str> = None; // Cargo.toml: sem acesso a linha anterior
+                if Self::is_suppressed(line, prev_line) { continue; }
                 findings.push(CryptoFinding {
                     file:           path.display().to_string(),
                     line:           lineno + 1,

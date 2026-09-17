@@ -67,6 +67,8 @@ td{padding:.6rem 1rem;border-bottom:1px solid #0a1628}
   <a href="/prospect/iti">📧 ITI</a>
   <a href="/prospect/serpro">📧 SERPRO</a>
   <a href="/prospect/btg">📧 BTG</a>
+  <a href="/demo/run">🔬 Rodar Demo</a>
+  <a href="/demo/history">📊 Histórico Demos</a>
   <span class="badge">{{ pending_count }} pendentes</span>
 </nav>
 <main>
@@ -207,6 +209,101 @@ def gen_faq():
     from vulcan import generate_faq
     generate_faq()
     return redirect("/")
+
+
+@app.route("/demo/run")
+def demo_run_form():
+    return render_template_string("""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>OmniUil AI — Demo Agent</title>
+<style>
+body{background:#020b14;color:#e0f0ff;font-family:'Segoe UI',system-ui,sans-serif;padding:2rem}
+h1{color:#00d4ff}
+.card{background:#07111e;border:1px solid #1a3a5c;border-radius:10px;padding:2rem;max-width:600px;margin:0 auto}
+label{font-size:.75rem;color:#4a9abb;display:block;margin-bottom:4px;letter-spacing:.1em}
+input,select{background:#040d1a;border:1px solid #1a3a5c;border-radius:6px;color:#e0f0ff;padding:.6rem .9rem;width:100%;margin-bottom:1rem;font-size:.9rem;box-sizing:border-box}
+.btn{background:#00d4ff22;color:#00d4ff;border:1px solid #00d4ff44;padding:.65rem 1.5rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem;width:100%}
+.btn:hover{background:#00d4ff33}
+.note{font-size:.75rem;color:#4a6a8a;margin-top:.75rem;line-height:1.6}
+</style></head><body>
+<h1>🔬 Demo Agent — OmniUil AI v5.0</h1>
+<div class="card">
+  <form method="post" action="/demo/execute">
+    <label>EMPRESA DO PROSPECT</label>
+    <input name="company" placeholder="Ex: Nubank" required>
+    <label>NOME DO CONTATO</label>
+    <input name="contact" placeholder="Ex: Joao Silva — CISO" required>
+    <label>E-MAIL DO CONTATO</label>
+    <input name="email" type="email" placeholder="ciso@empresa.com.br" required>
+    <label>CAMINHO DO REPOSITÓRIO (local em /tmp/)</label>
+    <input name="repo_path" placeholder="Ex: /tmp/webgoat" required>
+    <label>URL DO REPOSITÓRIO (para o relatório)</label>
+    <input name="repo_url" placeholder="https://github.com/empresa/repo">
+    <label>EXCLUIR PADRÕES (separados por virgula)</label>
+    <input name="exclude" value="**/test/**,**/tests/**" placeholder="**/test/**,**/tests/**">
+    <button class="btn" type="submit">🚀 Executar Demonstração Completa</button>
+    <p class="note">
+    ⏱ O scan leva 30-120s dependendo do repositório.<br>
+    ✅ Relatório fica pendente no dashboard para sua aprovação antes de ser enviado.<br>
+    🔒 Nenhum código sai da sua máquina.
+    </p>
+  </form>
+</div></body></html>""")
+
+@app.route("/demo/execute", methods=["POST"])
+def demo_execute():
+    import sys, os
+    sys.path.insert(0, os.path.expanduser("~/QSEC/agents"))
+    sys.path.insert(0, os.path.expanduser("~/QSEC/qsec-enterprise/api"))
+    from demo_agent import generate_demo_report
+    company   = request.form.get("company","")
+    contact   = request.form.get("contact","")
+    email     = request.form.get("email","")
+    repo_path = request.form.get("repo_path","")
+    repo_url  = request.form.get("repo_url","")
+    exclude   = [p.strip() for p in request.form.get("exclude","").split(",") if p.strip()]
+    result = generate_demo_report(
+        company=company, contact_name=contact,
+        repo_path=repo_path, repo_url=repo_url,
+        exclude_patterns=exclude
+    )
+    if "error" in result:
+        return f'<p style="color:#ff4444;padding:2rem">Erro: {result["error"]}</p>'
+    from db import get_conn
+    conn = get_conn()
+    conn.execute("UPDATE pending_actions SET to_email=? WHERE id=?",
+                 (email, result["action_id"]))
+    conn.commit(); conn.close()
+    return redirect(f'/?demo=ok&score={result["score"]}&findings={result["findings"]}')
+
+@app.route("/demo/history")
+def demo_history():
+    from db import get_conn
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM pending_actions WHERE agent='Demo' ORDER BY created_at DESC LIMIT 20"
+    ).fetchall()
+    conn.close()
+    items = "".join(
+        f'<tr><td>#{r["id"]}</td><td>{r["subject"][:60]}</td>'
+        f'<td>{r["to_email"]}</td><td>{r["status"]}</td><td>{r["created_at"]}</td></tr>'
+        for r in rows
+    )
+    return f"""<html><head><meta charset="UTF-8">
+<style>
+body{{background:#020b14;color:#e0f0ff;padding:2rem;font-family:system-ui}}
+h1{{color:#00d4ff}}
+table{{width:100%;border-collapse:collapse}}
+th{{background:#0a1628;padding:.75rem;text-align:left;color:#4a9abb;font-size:.75rem;letter-spacing:.1em}}
+td{{padding:.75rem;border-bottom:1px solid #0a1628;font-size:.85rem}}
+a{{color:#00d4ff}}
+</style></head><body>
+<h1>🔬 Historico de Demonstracoes</h1>
+<table><thead><tr>
+<th>ID</th><th>Relatorio</th><th>Enviado para</th><th>Status</th><th>Data</th>
+</tr></thead><tbody>{items}</tbody></table>
+<p style="margin-top:1.5rem"><a href="/">← Voltar ao Dashboard</a></p>
+</body></html>"""
 
 if __name__ == "__main__":
     init_db()
