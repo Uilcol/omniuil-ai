@@ -34,3 +34,17 @@ MANUAL_LICENCA.md
 agents/gmail_token.json
 agents/gmail_credentials.json
 agents/agents.db
+
+# Proteções adicionais para repo público
+*.pem
+*.key
+*.p12
+*.pfx
+agents/gmail_token.json
+agents/gmail_credentials.json
+agents/agents.db
+MANUAL_LICENCA.md
+*.db
+.env
+.env.*
+secrets/
