@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![OmniUil AI](https://img.shields.io/badge/OmniUil_AI-v3.3.0-00d4ff?style=for-the-badge&logoColor=white)
+![OmniUil AI](https://img.shields.io/badge/OmniUil_AI-v3.4.0-00d4ff?style=for-the-badge&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Online-00e676?style=for-the-badge)
 ![Rust](https://img.shields.io/badge/Rust-1.75+-CE422B?style=for-the-badge&logo=rust&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -170,7 +170,7 @@ cargo build --release
 
 ---
 
-## API REST (22 endpoints)
+## API REST (25 endpoints)
 
 ```bash
 # Autenticar
@@ -314,6 +314,79 @@ Transforma 443 findings numa lista paralisante em plano acionavel.
 Priorizado por impacto de negocio. Estimativa de custo em BRL e deadline CNSA 2.0.
 
 Endpoints: POST /api/v1/v5/full-analysis | /v5/posture | /v5/drift | /v5/migration
+
+## GAPs Estrategicos Implementados (Set/2026)
+
+Tres capacidades criticas para conformidade enterprise foram entregues em setembro/2026, com testes de invariante e validacao de schema.
+
+### GAP 1 -- CBOM CycloneDX 1.5 (Rust)
+
+**O que e:** Crypto Bill of Materials no formato CycloneDX 1.5, aceito por ferramentas de compliance (OWASP Dependency-Track, Anchore, Grype).
+
+**O que resolve:** NIST e CNSA 2.0 exigem inventario de ativos criptograficos. Sem CBOM, o cliente nao sabe o que migrar nem por onde comecar.
+
+**Campos CNSA 2.0 obrigatorios (EO-14412):**
+
+| Campo | Valores |
+|-------|---------|
+| algorithm | RSA-2048, ECDSA-P256, ML-KEM-768, ML-DSA-65 |
+| key_size | bits |
+| crypto_maturity | UNKNOWN -> DISCOVERED -> ASSESSED -> PLANNED -> MIGRATING -> HYBRID -> PQC -> DEPRECATED |
+| quantum_risk | None / Weakened / Vulnerable / Broken |
+| cnsa2_compliance | score, ready flag, frameworks, nearest deadline |
+
+**Uso:**
+
+```bash
+./target/release/qsec scan ./src --format cbom > cbom.json
+```
+
+### GAP 2 -- Hybrid Detection (visibilidade positiva)
+
+**O :� e:** Deteccao positiva de algoritmos PQC e modos hibridos -- nao apenas reportar o que esta quebrado, mas confirmar o que ja esta migrado.
+
+| Regra | Severidade | Detecta | Classificacao |
+|-------|----------|---------|--------------|
+| QSC-H001 | INFO | X25519+ML-KEM hibrido | POSITIVO -- migracao em andamento |
+| QSC-H002 | INFO | ML-KEM (Kyber) | POSITIVO -- FIPS 203 finalizado |
+| QSC-H003 | INFO | ML-DSA (Dilithium) | POSITIVO -- FIPS 204 finalizado |
+| QSC-H004 | LOW | FN-DSA (FALCON) | INFO -- FIPS 206 em desenvolvimento |
+
+**Por que importa:** crypto-agility exige visibilidade do estado atual. Um CISO precisa ver quanto do codebase ja migrou, nao so quanto falta.
+
+### GAP 3 -- Vendor Assessment / TPRM
+
+**O que e:** modulo de Third-Party Risk Management com questionario CNSA 2.0 de 10 perguntas, score 0-100, e relatorio HTML executivo.
+
+**Cobertura de conformidade:**
+
+| Framework | Regiao |
+|-----------|--------|
+| EO-14412 (CNSA 2.0) | EUA |
+| NIST SP 800-161 (C-SCRM) | EUA |
+| ECB(ICT Risk | Europa |
+| BACEN 4.658 | Brasil |
+
+**Endpoints:**
+
+```bash
+GET  /api/v1/vendor/questions
+POST /api/v1/vendor/assess
+GET  /api/v1/vendor/report/{id}
+```
+
+### Invariantes de coerencia
+
+Tres invariantes arquiteturais garantidos por teste:
+
+1. **risk_level >= severity_floor** -- CBOM com RSA-CRITICAL NUNCA reporta LOW. Floor: >= 3 CRITICAL -> CRITICAL | 1-2 CRITICAL -> HIGH | >= 5 HIGH -> HIGH.
+2. **risk_color == cor(risk_level)** -- cor derivada do nivel final.
+3. **recommendation coerente com risk_level** -- narrativa derivada do nivel final, com quantificacao.
+
+**Testes:** 15 casos em qsec-enterprise/api/tests/.
+
+---
+
 
 ## Licenciamento
 
