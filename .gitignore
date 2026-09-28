@@ -49,3 +49,5 @@ MANUAL_LICENCA.md
 .env.*
 secrets/
 INSTRUCOES_CHAVES.md
+*.bak.*
+*.py.bak.*
