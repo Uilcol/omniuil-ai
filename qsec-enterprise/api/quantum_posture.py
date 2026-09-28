@@ -187,8 +187,39 @@ def calculate_quantum_posture(
     else:
         risk_level, risk_color = "CRITICAL", "red"
 
+    # ── Invariante: risco agregado >= piso de severidade ─────────────────
+    # Um CISO não pode ver "LOW" enquanto há achados CRITICAL listados.
+    # Regra: final = max(score_level, severity_floor)
+    _SEVERITY_ORDER = {"MINIMAL": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+    _SEVERITY_COLORS = {
+        "MINIMAL": "green",
+        "LOW":     "blue",
+        "MEDIUM":  "yellow",
+        "HIGH":    "orange",
+        "CRITICAL":"red",
+    }
+
+    severity_floor = "MINIMAL"
+    if critical_count >= 3:
+        severity_floor = "CRITICAL"
+    elif critical_count >= 1:
+        severity_floor = "HIGH"
+    elif high_count >= 5:
+        severity_floor = "HIGH"
+
+    if _SEVERITY_ORDER[severity_floor] > _SEVERITY_ORDER[risk_level]:
+        risk_level = severity_floor
+        risk_color = _SEVERITY_COLORS[severity_floor]
+
+    # ── Narrativa alinhada com o risk_level final ─────────────────────
+    # Chama DEPOIS do invariante para garantir coerência score/nível/texto.
+    recommendation = _generate_recommendation(
+        score, top_risks, months_left,
+        risk_level, critical_count, high_count,
+    )
+
     # ── Gera recomendação executiva ───────────────────────────────────────────
-    recommendation = _generate_recommendation(score, top_risks, months_left)
+    # recommendation movida para apos o calculo do invariant
     detail         = _generate_detail(score, category_counts, critical_count, months_left)
 
     return PostureBreakdown(
@@ -222,17 +253,59 @@ def _deadline_urgency() -> str:
     return "LOW"
 
 
-def _generate_recommendation(score: int, top_risks: list, months_left: int) -> str:
-    if score >= 80:
-        return "Postura criptográfica sólida. Monitoramento contínuo recomendado."
+def _generate_recommendation(
+    score: int,
+    top_risks: list,
+    months_left: int,
+    risk_level: str,
+    critical_count: int = 0,
+    high_count: int = 0,
+) -> str:
+    """Narrativa executiva alinhada com o risk_level final.
+
+    Invariante: a narrativa NUNCA contradiz o risk_level. Se o nível é HIGH,
+    o texto é HIGH, independente do score numérico. Isso previne relatórios
+    incoerentes (ex: "postura sólida" com RSA-CRITICAL listado).
+    """
     if not top_risks:
         return "Revisar cobertura do scan antes de concluir avaliação."
+
     top = top_risks[0]["category"]
-    if score < 20:
-        return f"Risco CRÍTICO: {top} detectado em múltiplos sistemas. Ação imediata necessária — {months_left} meses para deadline CNSA 2.0."
-    if score < 40:
-        return f"Risco ALTO: Priorizar migração de {top}. {months_left} meses para conformidade CNSA 2.0."
-    return f"Risco MÉDIO: Planejar migração de {top} nos próximos {min(months_left, 6)} meses."
+    months_str = f"{months_left} meses" if months_left > 0 else "prazo expirado"
+
+    # Quantifica os achados críticos para evitar afirmações genéricas
+    if critical_count >= 3:
+        escala = f"{critical_count} sistemas/componentes críticos"
+    elif critical_count >= 1:
+        escala = "pelo menos 1 componente crítico"
+    elif high_count >= 5:
+        escala = f"{high_count} componentes de alto risco"
+    else:
+        escala = "componentes identificados"
+
+    # Narrativa derivada do risk_level canônico (não do score)
+    if risk_level == "CRITICAL":
+        return (
+            f"Risco CRÍTICO: {top} detectado em {escala}. "
+            f"Ação imediata necessária — {months_str} para deadline CNSA 2.0."
+        )
+    if risk_level == "HIGH":
+        return (
+            f"Risco Alto: priorizar migração de {top} ({escala}). "
+            f"{months_str} para conformidade CNSA 2.0."
+        )
+    if risk_level == "MEDIUM":
+        return (
+            f"Risco Médio: planejar migração de {top} nos próximos "
+            f"{min(months_left, 6) if months_left > 0 else 3} meses."
+        )
+    if risk_level == "LOW":
+        return (
+            f"Risco Baixo: nenhuma ação imediata. Iniciar inventário "
+            f"de {top} conforme janela CNSA 2.0."
+        )
+    # MINIMAL
+    return "Postura criptográfica sólida. Monitoramento contínuo recomendado."
 
 
 def _generate_detail(score: int, cats: dict, critical: int, months: int) -> str:
