@@ -118,6 +118,8 @@ enum OutputFormat {
     Json,
     /// SARIF 2.1.0 — upload direto para GitHub Security tab
     Sarif,
+    /// CBOM — Crypto Bill of Materials (CycloneDX 1.5 + CNSA 2.0)
+    Cbom,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -382,6 +384,10 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
     match args.format {
         OutputFormat::Text  => println!("{}", platform.scan_report_text()),
         OutputFormat::Json  => println!("{}", serde_json::to_string_pretty(&findings)?),
+        OutputFormat::Cbom  => {
+            let cbom = qsec::cbom::generate_cbom(&findings, &args.path.display().to_string(), "3.3.0");
+            println!("{}", qsec::cbom::cbom_to_cyclonedx(&cbom));
+        }
         OutputFormat::Sarif => {
             let sarif_log = qsec::sarif::findings_to_sarif(&findings);
             println!("{}", qsec::sarif::to_json(&sarif_log)?);

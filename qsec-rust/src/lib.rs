@@ -34,6 +34,7 @@
 #![warn(missing_docs, clippy::all)]
 
 pub mod config;
+pub mod cbom;
 pub mod error;
 pub mod evidence;
 pub mod languages;

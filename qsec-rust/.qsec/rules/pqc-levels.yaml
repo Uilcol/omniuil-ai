@@ -70,3 +70,50 @@ rules:
     pattern: 'HQC128|HQC192|HQC256|hamming.quasi.cyclic'
     languages: []
     taint_sink: false
+
+  # ── Detecção de implementação híbrida PQC (POSITIVO — confirma migração) ──
+  - id: "QSC-H001"
+    severity: "LOW"
+    title: "Implementação híbrida PQC detectada (POSITIVO)"
+    description: >
+      Implementação híbrida clássico+PQC detectada. Modo híbrido é a abordagem
+      recomendada pelo NIST e NSA CNSA 2.0 durante a transição: combina algoritmo
+      clássico (X25519, ECDH) com PQC (ML-KEM-768) para manter compatibilidade
+      enquanto adiciona proteção quântica. Isto é um indicador POSITIVO de migração.
+    recommendation: >
+      Excelente — implementação híbrida é o caminho correto de migração.
+      Target final: ML-KEM-1024 puro (FIPS 203 Level 5) após 2027.
+      Verifique se está usando X25519Kyber768Draft00 ou ML-KEM-768 conforme IETF RFC draft.
+    pattern: 'X25519Kyber768|x25519_kyber|kyber768.*x25519|ml.kem.*x25519|xwing|X25519\+|hybrid.*kem|HybridKEM|X25519MLKEM'
+    languages: []
+    pqc_level: 3
+    taint_sink: false
+
+  - id: "QSC-H002"
+    severity: "LOW"
+    title: "ML-KEM detectado (POSITIVO — algoritmo PQC aprovado)"
+    description: >
+      ML-KEM (Module-Lattice-Based Key-Encapsulation Mechanism) detectado —
+      algoritmo PQC aprovado NIST FIPS 203. Indica que a migração PQC já está
+      em andamento neste componente.
+    recommendation: >
+      Confirme que está usando ML-KEM-768 (Level 3) ou ML-KEM-1024 (Level 5)
+      conforme exigido pelo CNSA 2.0. Evite ML-KEM-512 para sistemas NSS.
+    pattern: 'ML.KEM|MLKEM|Kyber(?:512|768|1024)|kyber_(?:512|768|1024)|pqcrypto.*kyber|oqs.*kyber|liboqs.*kem'
+    languages: []
+    pqc_level: 5
+    taint_sink: false
+
+  - id: "QSC-H003"
+    severity: "LOW"
+    title: "ML-DSA detectado (POSITIVO — assinatura PQC aprovada)"
+    description: >
+      ML-DSA (Module-Lattice-Based Digital Signature Algorithm) detectado —
+      algoritmo PQC aprovado NIST FIPS 204. Indica migração de assinaturas digitais.
+    recommendation: >
+      Confirme que está usando ML-DSA-65 (Level 3) ou ML-DSA-87 (Level 5)
+      conforme exigido pelo CNSA 2.0 para sistemas NSS.
+    pattern: 'ML.DSA|MLDSA|Dilithium(?:2|3|5)|dilithium_(?:2|3|5)|pqcrypto.*dilithium|oqs.*dilithium'
+    languages: []
+    pqc_level: 5
+    taint_sink: false

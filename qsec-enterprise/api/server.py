@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "qsec-agents"))
 from flask import Flask, request, jsonify, Response, send_from_directory, stream_with_context
 from licensing import check_access, declare_company_size, install_license_key, get_tier, get_tier_limits, check_repo_limit, TIER_LIMITS
 from quantum_posture import calculate_quantum_posture
+from vendor_assessment import register_vendor_routes
 from crypto_drift import detect_drift, get_drift_history, get_pending_alerts, init_drift_db
 from migration_intelligence import generate_migration_plan
 
@@ -1036,6 +1037,13 @@ def full_analysis_endpoint():
             ],
         },
     })
+
+# ─── Registra rotas de vendor assessment ───
+try:
+    register_vendor_routes(app, API_VERSION)
+    print('✅ Vendor routes registradas')
+except Exception as e:
+    print(f'⚠️  Falha ao registrar vendor routes: {e}')
 
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT",8080))
