@@ -64,9 +64,9 @@ rules:
 
   - id: QSC-206
     severity: LOW
-    title: Considere HQC como KEM alternativo ao ML-KEM
-    description: NIST selecionou HQC (Hamming Quasi-Cyclic) como KEM alternativo em 2025, baseado em error-correcting codes. Provê diversidade caso seja descoberta vulnerabilidade em lattice problems do ML-KEM.
-    recommendation: Para sistemas de alta criticidade, implemente HQC como KEM secundario ao ML-KEM-1024.
+    title: HQC como KEM backup ao ML-KEM (selecionado NIST mar/2025 - FIPS pendente 2027)
+    description: "HQC selecionado NIST marco/2025 como KEM backup ao ML-KEM. ATENCAO: HQC e algoritmo SELECIONADO, nao FIPS final. Draft NIST previsto 2026, finalizacao 2027. Use ML-KEM-768/1024 (FIPS 203) como KEM primario."
+    recommendation: "Use ML-KEM-1024 (FIPS 203 finalizado) como KEM primario obrigatorio. HQC somente como KEM secundario apos finalizacao do FIPS (prevista 2027)."
     pattern: 'HQC128|HQC192|HQC256|hamming.quasi.cyclic'
     languages: []
     taint_sink: false
@@ -116,4 +116,14 @@ rules:
     pattern: 'ML.DSA|MLDSA|Dilithium(?:2|3|5)|dilithium_(?:2|3|5)|pqcrypto.*dilithium|oqs.*dilithium'
     languages: []
     pqc_level: 5
+    taint_sink: false
+
+  - id: QSC-H004
+    title: "FN-DSA/FALCON detectado (FIPS 206 em desenvolvimento - nao finalizado set/2026)"
+    severity: LOW
+    description: "FN-DSA (FALCON) foi selecionado pelo NIST mas FIPS 206 ainda nao foi finalizado. Use ML-DSA-65/87 (FIPS 204 finalizado ago/2024) como algoritmo de assinatura primario."
+    recommendation: "Use ML-DSA-65 ou ML-DSA-87 (FIPS 204) para assinaturas. Aguarde FIPS 206 antes de adotar FN-DSA em producao."
+    pattern: 'falcon|fn.dsa|FALCON_(?:512|1024)|pqcrypto.*falcon|oqs.*falcon'
+    languages: []
+    pqc_level: 4
     taint_sink: false
