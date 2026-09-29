@@ -34,7 +34,13 @@ A conformidade com **CNSA 2.0** torna-se obrigatória em **2027**.
 
 ## O que detecta
 
-### 14 regras PQC builtin
+### 37 regras PQC builtin
+
+> **Contagem:** 23 regras clássicas (RSA, ECDSA, DH, MD5, SHA-1, DES,
+> RC4, JWT none, hardcoded secrets) + 10 language-specific patterns
+> (Python, Java, Go, JavaScript, Rust) + 4 regras híbridas
+> (X25519+ML-KEM, ML-KEM, ML-DSA, FN-DSA).
+
 
 | Regra | Severidade | Detecta |
 |-------|-----------|---------|
@@ -246,7 +252,7 @@ Os agentes disponíveis variam conforme o plano contratado.
 | | **Free** | **Starter** | **Pro** | **Enterprise** |
 |---|---|---|---|---|
 | Engine CLI (`qsec-rust`) | ✅ Ilimitado | ✅ Ilimitado | ✅ Ilimitado | ✅ Ilimitado |
-| 14 regras PQC + YAML custom | ✅ | ✅ | ✅ | ✅ |
+| 37 regras PQC + YAML custom | ✅ | ✅ | ✅ | ✅ |
 | Taint analysis | ✅ | ✅ | ✅ | ✅ |
 | SBOM, PQC-JWT, SARIF | ✅ | ✅ | ✅ | ✅ |
 | Dashboard web | ❌ | ✅ | ✅ | ✅ |
