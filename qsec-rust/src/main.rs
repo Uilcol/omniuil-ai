@@ -120,6 +120,10 @@ enum OutputFormat {
     Sarif,
     /// CBOM — Crypto Bill of Materials (CycloneDX 1.5 + CNSA 2.0)
     Cbom,
+    /// X509 — Descoberta de certificados X.509 e configurações TLS
+    X509,
+    /// Graph — Crypto Knowledge Graph (nós, arestas, prioridade de migração)
+    Graph,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -387,6 +391,21 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
         OutputFormat::Cbom  => {
             let cbom = qsec::cbom::generate_cbom(&findings, &args.path.display().to_string(), "3.3.0");
             println!("{}", qsec::cbom::cbom_to_cyclonedx(&cbom));
+        }
+        OutputFormat::X509  => {
+            // X.509/TLS Discovery — analisa certificados no caminho escaneado
+            let content = if args.path.is_file() {
+                std::fs::read_to_string(&args.path).unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let certs   = qsec::x509_discovery::discover_certs_in_file(&args.path, &content);
+            let summary = qsec::x509_discovery::summarize_discovery(&certs);
+            println!("{}", qsec::x509_discovery::discovery_to_json(&certs, &summary));
+        }
+        OutputFormat::Graph => {
+            let graph = qsec::crypto_graph::build_crypto_graph(&findings);
+            println!("{}", qsec::crypto_graph::graph_to_json(&graph));
         }
         OutputFormat::Sarif => {
             let sarif_log = qsec::sarif::findings_to_sarif(&findings);

@@ -35,6 +35,8 @@
 
 pub mod config;
 pub mod cbom;
+pub mod x509_discovery;
+pub mod crypto_graph;
 pub mod error;
 pub mod evidence;
 pub mod languages;
