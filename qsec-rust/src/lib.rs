@@ -122,7 +122,7 @@ impl QsecPlatform {
         let key_registry = KeyRegistry::new(PqcEngine::new())
             .map_err(QsecError::ZeroTrust)?;
 
-        println!(
+        eprintln!(
             "[QSEC v{VERSION}] Backend: {}",
             engine.backend_name()
         );
