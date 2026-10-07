@@ -8,6 +8,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![NIST](https://img.shields.io/badge/NIST-FIPS_203%2F204-1a3a5c?style=for-the-badge)
+![Audit](https://img.shields.io/badge/Audit-98%2F100-brightgreen?style=for-the-badge)
 
 **O único scanner de segurança criptográfica pós-quântica com taint analysis,
 IA local e dashboard empresarial — 100% na sua infraestrutura, sem enviar
