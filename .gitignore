@@ -51,3 +51,8 @@ secrets/
 INSTRUCOES_CHAVES.md
 *.bak.*
 *.py.bak.*
+
+# VS Code extension build artifacts
+*.vsix
+*.vsix.map
+*.vsix.sha256

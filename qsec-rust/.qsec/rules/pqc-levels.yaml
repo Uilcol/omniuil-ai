@@ -127,3 +127,18 @@ rules:
     languages: []
     pqc_level: 4
     taint_sink: false
+
+
+  - id: QSC-116
+    severity: HIGH
+    title: Segredo hardcoded detectado
+    description: >
+      Segredo, token ou chave criptografica hardcoded no codigo.
+      Qualquer acesso ao repositorio expoe o segredo permanentemente.
+    recommendation: >
+      Use variaveis de ambiente ou HashiCorp Vault / AWS Secrets Manager.
+      Rotacione o segredo e limpe o historico git imediatamente.
+    pattern: 'password|passwd|api_key|apikey|auth_key|secret_key|private_key'
+    languages: []
+    pqc_level: 0
+    taint_sink: true

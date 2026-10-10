@@ -395,6 +395,34 @@ Tres invariantes arquiteturais garantidos por teste:
 ---
 
 
+
+## OmniUil AI v5.0 vs Concorrentes
+
+| Capacidade | OmniUil AI v5.0 | Semgrep | Snyk | Qodana 2026 | SonarQube |
+|---|---|---|---|---|---|
+| Scanner PQC especializado | ✅ 38 regras NIST | ❌ | ❌ | ❌ | ❌ |
+| Quantum Posture Score 0-100 | ✅ determinístico | ❌ | ❌ | ❌ | ❌ |
+| Crypto Drift Detection | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Migration Intelligence | ✅ custo+prazo+algoritmo | ❌ | ❌ | ❌ | ❌ |
+| CBOM CycloneDX 1.5 | ✅ | ❌ | ❌ | ❌ | ❌ |
+| X.509/TLS Discovery | ✅ | ❌ | Parcial | ❌ | ❌ |
+| Crypto Knowledge Graph | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Vendor Assessment TPRM | ✅ CNSA 2.0 | ❌ | ❌ | ❌ | ❌ |
+| 100% local sem cloud | ✅ | ❌ SaaS | ❌ SaaS | ❌ SaaS | ⚠️ |
+| Taint analysis | ✅ | ✅ genérico | ✅ | ✅ | ✅ |
+| SARIF GitHub Code Scanning | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SBOM CycloneDX | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Agentes IA locais Ollama | ✅ 5 agentes | ❌ | ❌ | ❌ | ❌ |
+| CNSA 2.0 + EO-14412 jun/2026 | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+### Resultados reais em projetos públicos
+
+| Projeto | Findings | CRITICAL | Quantum Posture |
+|---|---|---|---|
+| OWASP WebGoat | 51 | 13 | 22/100 HIGH |
+| Keycloak (excl. testes) | 443 | 87 | 15/100 CRITICAL |
+| Spring Security | 437 | 124 | 18/100 CRITICAL |
+
 ## Licenciamento
 
 | Componente | Licença |
