@@ -69,7 +69,7 @@ try:
 except SyntaxError as e:
     check("Sintaxe Python valida", False, str(e))
 
-check("Sem eval()", "eval(" not in va)
+check("Sem eval()", "eval(" not in va)  # nosec - detecção de padrão, não uso real de eval()
 check("Sem exec()", "exec(" not in va)
 check("Sem shell=True", "shell=True" not in va)
 check("Sem pickle", "import pickle" not in va)
@@ -228,7 +228,7 @@ check("Score 0-100 limitado", _score_limited)
 check("CNSA_DEADLINE definido", "CNSA_DEADLINE" in qp or "2027" in qp)
 check("Sem I/O de rede",
       all(x not in qp for x in ["requests.", "import urllib", "import socket"]))
-check("Sem eval()/exec()", "eval(" not in qp and "exec(" not in qp)
+check("Sem eval()/exec()", "eval(" not in qp and "exec(" not in qp)  # nosec - detecção de padrão, não uso real de eval()
 
 test1 = ROOT / "qsec-enterprise/api/tests/test_quantum_posture_invariant.py"
 test2 = ROOT / "qsec-enterprise/api/tests/test_recommendation_coherence.py"
