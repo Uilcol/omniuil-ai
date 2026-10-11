@@ -92,6 +92,10 @@ enum Command {
 
 #[derive(Args)]
 struct ScanArgs {
+    /// Aplica remediações automaticamente (apenas com --format remediate)
+    #[arg(long, default_value_t = false)]
+    fix: bool,
+
     /// Caminho do arquivo ou diretório a escanear
     path: PathBuf,
 
@@ -124,6 +128,8 @@ enum OutputFormat {
     X509,
     /// Graph — Crypto Knowledge Graph (nós, arestas, prioridade de migração)
     Graph,
+    /// Remediate — Auto-remediação PQC (dry-run por padrão, use --fix para aplicar)
+    Remediate,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -406,6 +412,19 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
         OutputFormat::Graph => {
             let graph = qsec::crypto_graph::build_crypto_graph(&findings);
             println!("{}", qsec::crypto_graph::graph_to_json(&graph));
+        }
+        OutputFormat::Remediate => {
+            let content = if args.path.is_file() {
+                std::fs::read_to_string(&args.path).unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let report = qsec::remediation::generate_remediation_report(
+                &args.path, &findings, &content, args.fix
+            );
+            // Mostra diff legível no stderr, JSON no stdout
+            eprintln!("{}", qsec::remediation::format_diff(&report));
+            println!("{}", qsec::remediation::remediation_to_json(&report));
         }
         OutputFormat::Sarif => {
             let sarif_log = qsec::sarif::findings_to_sarif(&findings);
