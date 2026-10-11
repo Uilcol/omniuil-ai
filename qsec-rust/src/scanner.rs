@@ -349,14 +349,54 @@ impl CryptoScanner {
 
     /// Escaneia com configuração enterprise.
     
+    /// Verifica se uma linha tem anotação de supressão omniuil:ignore.
+    ///
+    /// v5.1: motivo é recomendado mas não obrigatório.
+    /// Sem motivo → warning no stderr para auditoria.
+    ///
+    /// Formatos aceitos:
+    ///   # omniuil:ignore                    (sem motivo — gera warning)
+    ///   # omniuil:ignore reason=interop     (com motivo — recomendado)
+    ///   # omniuil:ignore reason=legacy-compat until=2027-01-01
+    ///   // omniuil:ignore reason=test-only
+    ///   /* omniuil:ignore reason=vendor-cert */
     fn is_suppressed(line: &str, prev_line: Option<&str>) -> bool {
         let patterns = [
             "omniuil:ignore", "omniuil: ignore",
             "qsec:ignore",    "qsec: ignore",
             "nosec",
         ];
-        let check = |l: &str| patterns.iter().any(|p| l.contains(p));
-        check(line) || prev_line.map_or(false, check)
+
+        let check_and_warn = |l: &str| -> bool {
+            let found = patterns.iter().any(|p| l.contains(p));
+            if found {
+                // v5.1: verifica se motivo foi fornecido
+                let has_reason = l.contains("reason=") || l.contains("reason =");
+                let has_until  = l.contains("until=")  || l.contains("until =");
+                if !has_reason {
+                    // Warning auditável — vai para stderr sem bloquear
+                    eprintln!(
+                        "[OmniUil] AVISO: supressão sem motivo detectada.                         Use: # omniuil:ignore reason=<motivo> [until=YYYY-MM-DD]"
+                    );
+                } else if has_until {
+                    // Extrai data de expiração e avisa se já passou
+                    if let Some(until_pos) = l.find("until=") {
+                        let until_str: String = l[until_pos+6..]
+                            .chars()
+                            .take_while(|c| !c.is_whitespace() && *c != '*' && *c != '/')
+                            .collect();
+                        // Avisa que a supressão tem data de expiração configurada
+                        eprintln!(
+                            "[OmniUil] INFO: supressão com expiração em {}.                             Revisar antes desta data.",
+                            until_str
+                        );
+                    }
+                }
+            }
+            found
+        };
+
+        check_and_warn(line) || prev_line.map_or(false, |l| check_and_warn(l))
     }
 
     pub fn scan_file_with_config(

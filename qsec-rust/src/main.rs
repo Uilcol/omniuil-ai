@@ -318,7 +318,7 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
         match std::fs::read_to_string(config_path) {
             Ok(content) => toml::from_str::<QsecConfig>(&content).unwrap_or_default(),
             Err(e) => {
-                eeprintln!("[QSEC] Warning: could not read config {}: {e}", config_path.display());
+                eprintln!("[QSEC] Warning: could not read config {}: {e}", config_path.display());
                 QsecConfig::default()
             }
         }
@@ -354,7 +354,7 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
     let mut config = config.clone();
     if !args.exclude.is_empty() {
         config.scanner.ignore_paths.extend(args.exclude.iter().cloned());
-        eeprintln!("[QSEC] {} padrão(ões) de exclusão customizado(s) aplicado(s)", args.exclude.len());
+        eprintln!("[QSEC] {} padrão(ões) de exclusão customizado(s) aplicado(s)", args.exclude.len());
     }
     let config = &config;
     platform.scanner.clear();
