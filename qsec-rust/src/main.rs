@@ -130,6 +130,8 @@ enum OutputFormat {
     Graph,
     /// Remediate — Auto-remediação PQC (dry-run por padrão, use --fix para aplicar)
     Remediate,
+    /// CrossTaint — Cross-file taint analysis (detecta vulnerabilidades entre arquivos)
+    CrossTaint,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -412,6 +414,34 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
         OutputFormat::Graph => {
             let graph = qsec::crypto_graph::build_crypto_graph(&findings);
             println!("{}", qsec::crypto_graph::graph_to_json(&graph));
+        }
+        OutputFormat::CrossTaint => {
+            // Cross-file taint: coleta todos os arquivos do diretório
+            let mut file_contents: Vec<(String, String)> = Vec::new();
+            let target = &args.path;
+            if target.is_file() {
+                if let Ok(content) = std::fs::read_to_string(target) {
+                    file_contents.push((target.display().to_string(), content));
+                }
+            } else {
+                // Coleta arquivos de código-fonte no diretório
+                let extensions = ["py","java","go","js","ts","cs","rs"];
+                if let Ok(entries) = std::fs::read_dir(target) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                            if extensions.contains(&ext) {
+                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                    file_contents.push((path.display().to_string(), content));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let result = qsec::cross_file_taint::analyze_cross_file(&file_contents);
+            eprintln!("{}", qsec::cross_file_taint::format_cross_taint(&result));
+            println!("{}", qsec::cross_file_taint::cross_taint_to_json(&result));
         }
         OutputFormat::Remediate => {
             let content = if args.path.is_file() {
