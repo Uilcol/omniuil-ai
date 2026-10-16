@@ -132,6 +132,8 @@ enum OutputFormat {
     Remediate,
     /// CrossTaint — Cross-file taint analysis (detecta vulnerabilidades entre arquivos)
     CrossTaint,
+    /// Jvm — Análise de bytecode JVM (.class e .jar)
+    Jvm,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -356,7 +358,26 @@ fn run(cli: Cli) -> Result<i32, Box<dyn std::error::Error>> {
 // ─── Comandos ─────────────────────────────────────────────────────────────────
 
 fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::error::Error>> {
-    let mut platform = QsecPlatform::new()?;
+        // JVM early-return
+    if matches!(args.format, OutputFormat::Jvm) {
+        let reports = if args.path.is_file() {
+            vec![qsec::jvm_bytecode::analyze_bytecode(&args.path)]
+        } else {
+            qsec::jvm_bytecode::analyze_bytecode_directory(&args.path)
+        };
+        let total: usize = reports.iter().map(|r| r.findings.len()).sum();
+        eprintln!("[OmniUil] JVM: {} arquivo(s), {} finding(s)", reports.len(), total);
+        for r in &reports {
+            if !r.findings.is_empty() {
+                for f in &r.findings {
+                    eprintln!("  [{}/{}] {} — {}", f.severity, f.rule_id, f.algorithm, f.evidence);
+                }
+            }
+        }
+        println!("{}", qsec::jvm_bytecode::bytecode_to_json(&reports));
+        return Ok(if total > 0 { 1 } else { 0 });
+    }
+let mut platform = QsecPlatform::new()?;
 
     // Usa scan com config — respeita ignore_paths, disabled_rules, custom_patterns
     let mut config = config.clone();
@@ -414,6 +435,26 @@ fn cmd_scan(args: ScanArgs, config: &QsecConfig) -> Result<i32, Box<dyn std::err
         OutputFormat::Graph => {
             let graph = qsec::crypto_graph::build_crypto_graph(&findings);
             println!("{}", qsec::crypto_graph::graph_to_json(&graph));
+        }
+        OutputFormat::Jvm => {
+            let reports = if args.path.is_file() {
+                vec![qsec::jvm_bytecode::analyze_bytecode(&args.path)]
+            } else {
+                qsec::jvm_bytecode::analyze_bytecode_directory(&args.path)
+            };
+            let total: usize = reports.iter().map(|r| r.findings.len()).sum();
+            eprintln!("[OmniUil] JVM Bytecode Analysis: {} arquivo(s), {} finding(s)",
+                reports.len(), total);
+            for r in &reports {
+                if !r.findings.is_empty() {
+                    eprintln!("  {} — {}", r.file, r.summary);
+                    for f in &r.findings {
+                        eprintln!("    [{}/{}] {} — {}",
+                            f.severity, f.rule_id, f.algorithm, f.evidence);
+                    }
+                }
+            }
+            println!("{}", qsec::jvm_bytecode::bytecode_to_json(&reports));
         }
         OutputFormat::CrossTaint => {
             // Cross-file taint: coleta todos os arquivos do diretório
@@ -650,6 +691,7 @@ fn cmd_apikey(args: ApikeyArgs) -> Result<i32, Box<dyn std::error::Error>> {
 }
 
 fn cmd_pipeline(args: PipelineArgs) -> Result<i32, Box<dyn std::error::Error>> {
+
     let mut platform  = QsecPlatform::new()?;
     let art_refs: Vec<&Path> = args.artifacts.iter().map(PathBuf::as_path).collect();
 

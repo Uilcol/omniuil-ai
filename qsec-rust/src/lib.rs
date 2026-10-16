@@ -37,6 +37,7 @@ pub mod config;
 pub mod cbom;
 pub mod remediation;
 pub mod cross_file_taint;
+pub mod jvm_bytecode;
 pub mod x509_discovery;
 pub mod crypto_graph;
 pub mod error;
