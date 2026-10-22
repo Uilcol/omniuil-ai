@@ -12,12 +12,12 @@ from vendor_assessment import register_vendor_routes
 from crypto_drift import detect_drift, get_drift_history, get_pending_alerts, init_drift_db
 from migration_intelligence import generate_migration_plan
 
-_RAW_SECRET = os.environ.get("QSEC_API_SECRET", "dev-secret-change-in-production")
-_DEFAULT_SECRET = "dev-secret-change-in-production"
-# FIX HIGH: refuse startup with default secret in production
-if os.environ.get("QSEC_PRODUCTION") == "1" and _RAW_SECRET == _DEFAULT_SECRET:
-    import sys as _sys
-    print("FATAL: QSEC_API_SECRET not set. Cannot start in QSEC_PRODUCTION=1 mode with default secret.", file=_sys.stderr)
+# Segredo da API: obrigatório e sem valor padrão (o repositório é público).
+import sys as _sys
+_DEFAULT_SECRET = "dev-secret-change-in-production"  # omniuil:ignore reason=known-public-default-rejected-at-startup
+_RAW_SECRET = os.environ.get("QSEC_API_SECRET", "")
+if not _RAW_SECRET or _RAW_SECRET == _DEFAULT_SECRET or len(_RAW_SECRET) < 32:
+    print("FATAL: defina QSEC_API_SECRET com no mínimo 32 caracteres (o valor padrão público não é aceito).", file=_sys.stderr)
     _sys.exit(1)
 API_SECRET    = _RAW_SECRET
 QSEC_BIN      = os.environ.get("QSEC_BIN", str(Path(__file__).parent.parent.parent / "qsec-rust/target/release/qsec"))
