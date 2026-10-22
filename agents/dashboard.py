@@ -310,4 +310,4 @@ if __name__ == "__main__":
     from config import DASHBOARD_PORT
     print(f"\n🚀 Dashboard OmniUil AI Agents rodando em http://localhost:{DASHBOARD_PORT}")
     print("   Mercury (Comercial) + Vulcan (Técnico) prontos para aprovação")
-    app.run(host="0.0.0.0", port=DASHBOARD_PORT, debug=False)
+    app.run(host="127.0.0.1", port=DASHBOARD_PORT, debug=False)

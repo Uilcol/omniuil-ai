@@ -1047,7 +1047,7 @@ except Exception as e:
 
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT",8080))
-    host  = os.environ.get("HOST","0.0.0.0")
+    host  = os.environ.get("HOST","127.0.0.1")
     debug = os.environ.get("DEBUG","").lower()=="true"
     print("QSEC Enterprise API Server v3.2.1 (hardened)")
     print("  Host:", host+":"+str(port), "| CORS: allowlist |",
