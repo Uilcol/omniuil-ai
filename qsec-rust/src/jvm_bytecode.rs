@@ -455,7 +455,11 @@ pub fn analyze_bytecode_directory(dir: &Path) -> Vec<BytecodeReport> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
+            let ft = match entry.file_type() { Ok(t) => t, Err(_) => continue };
+            if ft.is_symlink() { continue; }
+            if ft.is_dir() {
+                let dname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if matches!(dname, ".git" | "node_modules") { continue; }
                 reports.extend(analyze_bytecode_directory(&path));
             } else {
                 let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");

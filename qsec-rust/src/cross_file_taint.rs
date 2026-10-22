@@ -427,3 +427,36 @@ pub fn format_cross_taint(result: &CrossFileTaintResult) -> String {
     }
     out
 }
+
+/// Coleta arquivos de código recursivamente: iterativo, sem seguir symlinks,
+/// ignora diretórios pesados e limita quantidade e tamanho de arquivos.
+pub fn collect_source_files(root: &Path) -> Vec<(String, String)> {
+    const MAX_FILES: usize = 20_000;
+    const MAX_BYTES: u64 = 1_000_000;
+    let exts = ["py", "java", "go", "js", "ts", "cs", "rs"];
+    let skip = [".git", "node_modules", "target", "vendor", ".venv", "__pycache__"];
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let entries = match std::fs::read_dir(&dir) { Ok(e) => e, Err(_) => continue };
+        for entry in entries.flatten() {
+            if out.len() >= MAX_FILES { return out; }
+            let ft = match entry.file_type() { Ok(t) => t, Err(_) => continue };
+            if ft.is_symlink() { continue; }
+            let path = entry.path();
+            if ft.is_dir() {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if skip.contains(&name) { continue; }
+                stack.push(path);
+            } else if ft.is_file() {
+                let ext_ok = path.extension().and_then(|e| e.to_str()).map_or(false, |e| exts.contains(&e));
+                if !ext_ok { continue; }
+                if entry.metadata().map(|m| m.len() > MAX_BYTES).unwrap_or(true) { continue; }
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    out.push((path.display().to_string(), content));
+                }
+            }
+        }
+    }
+    out
+}

@@ -134,6 +134,8 @@ enum OutputFormat {
     CrossTaint,
     /// Jvm — Análise de bytecode JVM (.class e .jar)
     Jvm,
+    /// Secrets — Detecção de segredos por entropia + padrões (heurística)
+    Secrets,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -456,6 +458,23 @@ let mut platform = QsecPlatform::new()?;
             }
             println!("{}", qsec::jvm_bytecode::bytecode_to_json(&reports));
         }
+        OutputFormat::Secrets => {
+            let reports = if args.path.is_file() {
+                if let Ok(content) = std::fs::read_to_string(&args.path) {
+                    vec![qsec::secret_detection::SecretReport {
+                        file: args.path.display().to_string(),
+                        findings: qsec::secret_detection::detect_secrets_in_file(
+                            &args.path, &content),
+                        files_scanned: 1,
+                        summary: String::new(),
+                    }]
+                } else { vec![] }
+            } else {
+                qsec::secret_detection::detect_secrets_in_directory(&args.path)
+            };
+            eprintln!("{}", qsec::secret_detection::format_secrets_report(&reports));
+            println!("{}", qsec::secret_detection::secrets_to_json(&reports));
+        }
         OutputFormat::CrossTaint => {
             // Cross-file taint: coleta todos os arquivos do diretório
             let mut file_contents: Vec<(String, String)> = Vec::new();
@@ -465,20 +484,7 @@ let mut platform = QsecPlatform::new()?;
                     file_contents.push((target.display().to_string(), content));
                 }
             } else {
-                // Coleta arquivos de código-fonte no diretório
-                let extensions = ["py","java","go","js","ts","cs","rs"];
-                if let Ok(entries) = std::fs::read_dir(target) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            if extensions.contains(&ext) {
-                                if let Ok(content) = std::fs::read_to_string(&path) {
-                                    file_contents.push((path.display().to_string(), content));
-                                }
-                            }
-                        }
-                    }
-                }
+                file_contents = qsec::cross_file_taint::collect_source_files(target);
             }
             let result = qsec::cross_file_taint::analyze_cross_file(&file_contents);
             eprintln!("{}", qsec::cross_file_taint::format_cross_taint(&result));

@@ -415,13 +415,9 @@ Tres invariantes arquiteturais garantidos por teste:
 | Agentes IA locais Ollama | ✅ 5 agentes | ❌ | ❌ | ❌ | ❌ |
 | CNSA 2.0 + EO-14412 jun/2026 | ✅ | ❌ | ❌ | ❌ | ❌ |
 
-### Resultados reais em projetos públicos
+### Resultados em projetos públicos
 
-| Projeto | Findings | CRITICAL | Quantum Posture |
-|---|---|---|---|
-| OWASP WebGoat | 51 | 13 | 22/100 HIGH |
-| Keycloak (excl. testes) | 443 | 87 | 15/100 CRITICAL |
-| Spring Security | 437 | 124 | 18/100 CRITICAL |
+As medições serão republicadas com a versão atual do engine, junto com os comandos para reproduzi-las.
 
 ## Licenciamento
 
