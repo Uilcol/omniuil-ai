@@ -285,8 +285,8 @@ def demo_history():
     ).fetchall()
     conn.close()
     items = "".join(
-        f'<tr><td>#{r["id"]}</td><td>{r["subject"][:60]}</td>'
-        f'<td>{r["to_email"]}</td><td>{r["status"]}</td><td>{r["created_at"]}</td></tr>'
+        f'<tr><td>#{r["id"]}</td><td>{_esc(str(r["subject"])[:60])}</td>'
+        f'<td>{_esc(str(r["to_email"]))}</td><td>{_esc(str(r["status"]))}</td><td>{_esc(str(r["created_at"]))}</td></tr>'
         for r in rows
     )
     return f"""<html><head><meta charset="UTF-8">
@@ -304,6 +304,24 @@ a{{color:#00d4ff}}
 </tr></thead><tbody>{items}</tbody></table>
 <p style="margin-top:1.5rem"><a href="/">← Voltar ao Dashboard</a></p>
 </body></html>"""
+
+# ── Proteção contra CSRF e DNS rebinding (dashboard local) ───────────────────
+from config import DASHBOARD_PORT as _DASH_PORT
+from html import escape as _esc
+_ALLOWED_HOSTS = {"localhost:%s" % _DASH_PORT, "127.0.0.1:%s" % _DASH_PORT}
+
+@app.before_request
+def _csrf_and_rebinding_guard():
+    from flask import request as _rq, abort as _abort
+    if (_rq.host or "").lower() not in _ALLOWED_HOSTS:
+        _abort(403)
+    site = _rq.headers.get("Sec-Fetch-Site")
+    if site is not None and site not in ("same-origin", "none"):
+        _abort(403)
+    if _rq.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = _rq.headers.get("Origin")
+        if origin is not None and origin.lower() not in {"http://" + h for h in _ALLOWED_HOSTS}:
+            _abort(403)
 
 if __name__ == "__main__":
     init_db()
