@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 from flask import Flask, request, jsonify
+import html as _html, re as _re, sqlite3, os as _os
 
 # ── Questionário CNSA 2.0 para fornecedores ──────────────────────────────────
 ASSESSMENT_QUESTIONS = [
@@ -230,7 +231,7 @@ def assessment_to_report(a: VendorAssessment) -> str:
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Vendor PQC Assessment — {a.vendor_name}</title>
+<title>Vendor PQC Assessment — {_html.escape(str(a.vendor_name))}</title>
 <style>
 body{{font-family:'Segoe UI',system-ui;background:#020b14;color:#e0f0ff;padding:2rem;margin:0}}
 h1{{color:#00d4ff}}h2{{color:#4a9abb;border-bottom:1px solid #1a3a5c;padding-bottom:.5rem}}
@@ -246,7 +247,7 @@ ul{{line-height:2;color:#8aaa}}
 </style></head><body>
 <h1>⚡ OmniUil AI — Vendor PQC Assessment</h1>
 <div class="card">
-  <p>Fornecedor: <strong>{a.vendor_name}</strong> | Avaliador: {a.assessor_company}</p>
+  <p>Fornecedor: <strong>{_html.escape(str(a.vendor_name))}</strong> | Avaliador: {_html.escape(str(a.assessor_company))}</p>
   <p>ID: <code>{a.assessment_id}</code> | Gerado: {a.generated_at[:10]} | Válido até: {a.expires_at[:10]}</p>
   <div class="score">{a.score}/100</div>
   <span class="badge">{a.risk_level} RISK</span>
@@ -263,56 +264,85 @@ Alinhado com EO-14412 (jun/2026), NIST FIPS 203/204/205, NSA CNSA 2.0, BACEN 4.6
 </div></body></html>"""
 
 # ── Endpoints Flask para integração com server.py ─────────────────────────────
-def register_vendor_routes(app: Flask, API_VERSION: str):
-    """Registra rotas de vendor assessment no servidor Flask existente."""
+_QIDS = {q["id"] for q in ASSESSMENT_QUESTIONS}
+_VA_DB = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "omniuil.db")
+_VA_ID = _re.compile(r"^VA-[0-9A-F]{8}$")
 
-    @app.route(f"/api/{API_VERSION}/vendor/questions")
+def _va_conn():
+    c = sqlite3.connect(_VA_DB)
+    c.execute("CREATE TABLE IF NOT EXISTS vendor_assessments (id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+    return c
+
+def _va_save(a):
+    c = _va_conn()
+    try:
+        c.execute("INSERT OR REPLACE INTO vendor_assessments (id, data) VALUES (?, ?)", (a.assessment_id, json.dumps(asdict(a))))
+        c.commit()
+    finally:
+        c.close()
+
+def _va_load(aid):
+    if not _VA_ID.match(aid):
+        return None
+    c = _va_conn()
+    try:
+        row = c.execute("SELECT data FROM vendor_assessments WHERE id = ?", (aid,)).fetchone()
+    finally:
+        c.close()
+    return VendorAssessment(**json.loads(row[0])) if row else None
+
+def _valid_responses(raw):
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for k, val in raw.items():
+        if k not in _QIDS or isinstance(val, bool) or not isinstance(val, int) or not 0 <= val <= 3:
+            return None
+        out[k] = val
+    return out
+
+def register_vendor_routes(app: Flask, API_VERSION: str):
+    """Registra as rotas de vendor assessment (a autenticação é aplicada pelo servidor)."""
+    base = "/api/" + API_VERSION + "/vendor"
+
+    @app.route(base + "/questions")
     def vendor_questions():
-        """Retorna questionário de assessment."""
         return jsonify({
             "version": "1.0",
             "questions": ASSESSMENT_QUESTIONS,
-            "instructions": (
-                "Responda cada questão com o índice da opção (0=melhor, 3=pior). "
-                "Score >= 70 e CNSA2 score >= 60 indica conformidade básica."
-            ),
+            "instructions": "Responda cada questão com o índice da opção (0=melhor, 3=pior). Questões sem resposta contam como 3.",
         })
 
-    @app.route(f"/api/{API_VERSION}/vendor/assess", methods=["POST"])
+    @app.route(base + "/assess", methods=["POST"])
     def vendor_assess():
-        """Executa avaliação PQC de fornecedor."""
-        body = request.get_json(force=True, silent=True) or {}
-        vendor_name      = body.get("vendor_name","")
-        vendor_email     = body.get("vendor_email","")
-        assessor_company = body.get("assessor_company","")
-        responses        = body.get("responses",{})
-
-        if not vendor_name:
-            return jsonify({"error":"vendor_name obrigatório"}), 400
-
-        a = create_assessment(vendor_name, vendor_email, assessor_company, responses)
+        body = request.get_json(force=True, silent=True)
+        if not isinstance(body, dict):
+            body = {}
+        name = str(body.get("vendor_name", "")).strip()[:200]
+        if not name:
+            return jsonify({"error": "vendor_name obrigatório"}), 400
+        responses = _valid_responses(body.get("responses", {}))
+        if responses is None:
+            return jsonify({"error": "responses inválido: use ids Q001..Q010 com inteiros de 0 a 3"}), 400
+        a = create_assessment(name, str(body.get("vendor_email", ""))[:200],
+                              str(body.get("assessor_company", ""))[:200], responses)
+        _va_save(a)
         return jsonify({
-            "assessment_id":    a.assessment_id,
-            "vendor_name":      a.vendor_name,
-            "score":            a.score,
-            "cnsa2_score":      a.cnsa2_score,
-            "risk_level":       a.risk_level,
-            "risk_color":       a.risk_color,
-            "compliant":        a.compliant,
-            "gaps":             a.gaps,
-            "recommendations":  a.recommendations,
-            "generated_at":     a.generated_at,
-            "expires_at":       a.expires_at,
-            "report_url":       f"/api/{API_VERSION}/vendor/report/{a.assessment_id}",
+            "assessment_id": a.assessment_id, "vendor_name": a.vendor_name,
+            "score": a.score, "cnsa2_score": a.cnsa2_score,
+            "risk_level": a.risk_level, "risk_color": a.risk_color, "compliant": a.compliant,
+            "gaps": a.gaps, "recommendations": a.recommendations,
+            "answered": len(responses), "unanswered": len(ASSESSMENT_QUESTIONS) - len(responses),
+            "generated_at": a.generated_at, "expires_at": a.expires_at,
+            "report_url": base + "/report/" + a.assessment_id,
         })
 
-    @app.route(f"/api/{API_VERSION}/vendor/report/<assessment_id>")
-    def vendor_report(assessment_id: str):
-        """Gera relatório HTML de um assessment (exemplo com dados mockados)."""
-        # Em produção: buscar do SQLite pelo assessment_id
-        mock = create_assessment(
-            "Fornecedor Exemplo", "vendor@exemplo.com", "Sua Empresa",
-            {"Q001":1,"Q002":2,"Q003":1,"Q004":0,"Q005":1,
-             "Q006":1,"Q007":2,"Q008":0,"Q009":1,"Q010":2}
-        )
-        return assessment_to_report(mock), 200, {"Content-Type":"text/html; charset=utf-8"}
+    @app.route(base + "/report/<assessment_id>")
+    def vendor_report(assessment_id):
+        a = _va_load(assessment_id)
+        if a is None:
+            return jsonify({"error": "avaliação não encontrada"}), 404
+        return assessment_to_report(a), 200, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+        }

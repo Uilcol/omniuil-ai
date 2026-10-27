@@ -313,7 +313,13 @@ def _rate_limit(tid, action, max_pm):
     return True
 
 def _run_qsec(*args, timeout=60):
-    if not Path(QSEC_BIN).exists(): return _simulate(*args)
+    if not Path(QSEC_BIN).exists():
+        if os.environ.get("QSEC_ALLOW_SIMULATION") != "1":
+            return {"success": False, "error": "Motor QSEC não encontrado (QSEC_BIN); simulação desativada. Use QSEC_ALLOW_SIMULATION=1 apenas em demonstração."}
+        _r = _simulate(*args)
+        _r["simulated"] = True
+        if isinstance(_r.get("data"), dict): _r["data"]["simulated"] = True
+        return _r
     try:
         r = subprocess.run([QSEC_BIN]+list(args), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=timeout)
         raw = r.stdout.strip()
@@ -1044,6 +1050,26 @@ try:
     print('✅ Vendor routes registradas')
 except Exception as e:
     print(f'⚠️  Falha ao registrar vendor routes: {e}')
+
+# ── Autenticação obrigatória na API (exceto rotas públicas explícitas) ─────────
+_PUBLIC_API_PATHS = {
+    "/api/" + API_VERSION + "/auth/token",
+    "/api/" + API_VERSION + "/license/status",
+}
+
+@app.before_request
+def _enforce_api_auth():
+    p = request.path
+    if not p.startswith("/api/" + API_VERSION + "/") or request.method == "OPTIONS":
+        return None
+    if p in _PUBLIC_API_PATHS:
+        return None
+    if "/agents/audit/" in p and p.endswith("/stream"):
+        return None  # EventSource não envia Authorization; o id do job é aleatório de 128 bits
+    vf = app.view_functions.get(request.endpoint)
+    if vf is not None and hasattr(vf, "__wrapped__"):
+        return None  # já protegida por @require_auth
+    return require_auth()(lambda: None)()
 
 if __name__ == "__main__":
     port  = int(os.environ.get("PORT",8080))
