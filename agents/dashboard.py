@@ -161,15 +161,14 @@ def edit_action(action_id):
     if not row:
         return redirect("/")
     if action == "approve":
-        # Envia o e-mail se for send_email
-        if row["action_type"] == "send_email" and row["to_email"]:
-            try:
-                send_email(row["to_email"], row["subject"], content)
-                from db import log_conversation
-                log_conversation(row["to_email"], "sent", row["subject"], content, row["agent"])
-                print(f"✅ E-mail enviado para {row['to_email']}")
-            except Exception as e:
-                print(f"❌ Erro ao enviar e-mail: {e}")
+        from send_gate import approve_and_send
+        ok, detail = approve_and_send(row, content, send_email)
+        if not ok:
+            from html import escape as _esc_msg
+            return ("<html><head><meta charset='utf-8'></head><body style='font-family:sans-serif;padding:2rem'>"
+                    "<h3>Não aprovado: o e-mail não foi enviado</h3><p>" + _esc_msg(detail) + "</p>"
+                    "<p>O item continua pendente. <a href='/'>Voltar ao dashboard</a></p></body></html>"), 422
+        print("✅ " + detail)
         approve_action(action_id)
     elif action == "reject":
         reject_action(action_id)

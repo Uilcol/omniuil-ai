@@ -82,8 +82,8 @@ def send_email(to, subject, body, reply_to_id=None):
     payload = {"raw": raw}
     if reply_to_id:
         payload["threadId"] = reply_to_id
-    service.users().messages().send(userId="me", body=payload).execute()
-    return True
+    resp = service.users().messages().send(userId="me", body=payload).execute()
+    return (resp or {}).get("id") or True
 
 def mark_as_read(msg_id):
     service = get_gmail_service()
